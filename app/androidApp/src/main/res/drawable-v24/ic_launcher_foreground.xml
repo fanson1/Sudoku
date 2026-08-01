@@ -1,0 +1,45 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Main Sudoku Cell Shape (3x3 grid feel) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,30h48v48h-48z" />
+
+    <!-- Dividing lines inside the white square -->
+    <path
+        android:strokeColor="#303F9F"
+        android:strokeWidth="1.5"
+        android:pathData="M46,30v48 M62,30v48 M30,46h48 M30,62h48" />
+
+    <!-- A stylized "5" in the center cell -->
+    <path
+        android:fillColor="#303F9F"
+        android:pathData="M51,51h6v1h-5v3h5c0.55,0 1,0.45 1,1v3c0,0.55 -0.45,1 -1,1h-6v-1h5v-3h-5v-5z" />
+
+    <!-- A stylized "1" in the top-left cell -->
+    <path
+        android:fillColor="#3F51B5"
+        android:pathData="M36,36h2v8h-2z" />
+
+    <!-- A stylized "9" in the bottom-right cell -->
+    <path
+        android:fillColor="#3F51B5"
+        android:pathData="M70,70h4v4h-4v-4z M70,70h4v8h-4v-1h3v-3h-3v-4z" />
+
+    <!-- Adding a subtle drop shadow to the white square -->
+    <path
+        android:pathData="M30,78h48v3h-48z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="54" android:startY="78" android:endX="54" android:endY="81">
+                <item android:color="#30000000" android:offset="0" />
+                <item android:color="#00000000" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+</vector>

@@ -1,0 +1,43 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="1024dp"
+    android:height="1024dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+
+    <!-- Background with shadow-like effect -->
+    <path
+        android:pathData="M128,128h768v768h-768z"
+        android:fillColor="#311B92" />
+
+    <!-- Main Card Body -->
+    <path
+        android:pathData="M160,160h704v704h-704z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="160" android:startY="160"
+                android:endX="864" android:endY="864"
+                android:type="linear">
+                <item android:offset="0" android:color="#673AB7"/>
+                <item android:offset="1" android:color="#512DA8"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Decorative Grid Background -->
+    <path
+        android:pathData="M280,280h464v464h-464z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.15" />
+
+    <!-- Stylized Sudoku Grid (The "9") -->
+    <path
+        android:pathData="M440,320h144v400h-144v-400zM440,320h144v64h-144v-64zM440,488h144v64h-144v-64zM440,656h144v64h-144v-64z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Accent Dots -->
+    <path
+        android:pathData="M320,320h48v48h-48zM656,656h48v48h-48z"
+        android:fillColor="#FFD600" />
+
+</vector>
