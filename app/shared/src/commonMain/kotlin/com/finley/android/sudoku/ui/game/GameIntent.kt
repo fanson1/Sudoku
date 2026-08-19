@@ -12,4 +12,8 @@ sealed class GameIntent {
     data object ResumeGame : GameIntent()
     data object StartNewGame : GameIntent()
     data class StartLevel(val level: Int) : GameIntent()
+    data object StartDailyChallenge : GameIntent()
+    data class StartTimedChallenge(val timeLimitSeconds: Int) : GameIntent()
+    data class SetAutoEraseNotes(val enabled: Boolean) : GameIntent()
+    data class SetShowConflicts(val enabled: Boolean) : GameIntent()
 }
