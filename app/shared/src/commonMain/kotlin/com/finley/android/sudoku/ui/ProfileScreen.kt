@@ -10,7 +10,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.finley.android.sudoku.network.NetworkService
+import com.finley.android.sudoku.ui.components.AppScreenBackground
+import com.finley.android.sudoku.ui.components.GradientButton
+import com.finley.android.sudoku.ui.components.pressScale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,117 +44,264 @@ fun ProfileScreen(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Profile", fontWeight = FontWeight.Bold) },
+                title = { Text("个人中心", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         },
         containerColor = Color.Transparent
     ) { padding ->
-        Box(
+        AppScreenBackground(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        )
-                    )
-                )
+                .padding(padding)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
-                    .padding(24.dp),
+                    .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // User Avatar and Name
-                Surface(
-                    modifier = Modifier.size(100.dp).clip(CircleShape),
-                    color = MaterialTheme.colorScheme.primary
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = currentUser?.username?.take(1)?.uppercase() ?: "?",
-                            fontSize = 48.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Avatar with gradient ring
+                Box {
+                    Box(
+                        modifier = Modifier
+                            .size(112.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.sweepGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.secondary,
+                                        MaterialTheme.colorScheme.tertiary,
+                                        MaterialTheme.colorScheme.primary
+                                    )
+                                )
+                            )
+                            .padding(4.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surface
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = currentUser?.username?.take(1)?.uppercase() ?: "?",
+                                    fontSize = 46.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 Text(
-                    text = currentUser?.username ?: "Guest",
+                    text = currentUser?.username ?: "游客",
                     fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Text(
-                    text = "Level ${currentUser?.unlockedLevel ?: 1} Master",
-                    color = MaterialTheme.colorScheme.secondary,
-                    fontSize = 14.sp
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Settings Options
-                Card(
+                PillBadgeCompat(
+                    text = "已解锁 ${currentUser?.unlockedLevel ?: 1} 关",
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                // Stats row
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    ProfileStatCard(
+                        icon = Icons.Default.MilitaryTech,
+                        value = "${currentUser?.unlockedLevel ?: 1}",
+                        label = "最高关卡",
+                        modifier = Modifier.weight(1f)
+                    )
+                    ProfileStatCard(
+                        icon = Icons.Default.EmojiEvents,
+                        value = "—",
+                        label = "全球排名",
+                        modifier = Modifier.weight(1f)
+                    )
+                    ProfileStatCard(
+                        icon = Icons.Default.Person,
+                        value = "在线",
+                        label = "账号状态",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    shadowElevation = 2.dp
                 ) {
                     Column {
                         ProfileOptionItem(
                             icon = Icons.Default.Edit,
-                            title = "Edit Username",
+                            title = "修改用户名",
+                            subtitle = "更新你的显示名称",
                             onClick = onEditUsername
                         )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
                         ProfileOptionItem(
                             icon = Icons.Default.Lock,
-                            title = "Change Password",
+                            title = "修改密码",
+                            subtitle = "定期更换密码更安全",
                             onClick = onChangePassword
                         )
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.weight(1f))
-                
-                Button(
+
+                GradientButton(
                     onClick = onLogout,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 54.dp,
+                    gradient = Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.error,
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
+                        )
+                    )
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Logout, null)
+                    Icon(Icons.AutoMirrored.Filled.Logout, null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Logout", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("退出登录", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
 }
 
 @Composable
-fun ProfileOptionItem(icon: ImageVector, title: String, onClick: () -> Unit) {
+private fun PillBadgeCompat(
+    text: String,
+    containerColor: Color,
+    contentColor: Color
+) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = containerColor,
+        contentColor = contentColor
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
+private fun ProfileStatCard(
+    icon: ImageVector,
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(colorScheme.surface.copy(alpha = 0.85f))
+            .padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = value,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = colorScheme.onSurface
+        )
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun ProfileOptionItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String = "",
+    onClick: () -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .pressScale()
             .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(title, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
-        Icon(Icons.Default.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+        Surface(
+            modifier = Modifier.size(42.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = colorScheme.primaryContainer.copy(alpha = 0.6f)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Medium, color = colorScheme.onSurface)
+            if (subtitle.isNotEmpty()) {
+                Text(
+                    text = subtitle,
+                    fontSize = 12.sp,
+                    color = colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.size(20.dp)
+        )
     }
 }

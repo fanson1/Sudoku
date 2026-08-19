@@ -62,6 +62,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.multiplatform.settings)
+            implementation(libs.kotlinx.datetime)
 
             // Ktor Client
             implementation(libs.ktor.clientCore)
@@ -78,6 +79,9 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+        jvmTest.dependencies {
+            implementation(libs.kotlinx.coroutinesTest)
         }
         jsMain.dependencies {
             implementation(libs.wrappers.browser)

@@ -128,4 +128,24 @@ class SudokuSolver {
         }
         return conflicts
     }
+
+    /** Returns the valid candidates (1..9) that can legally go into cell (row, col). */
+    fun getCandidates(board: Board, row: Int, col: Int): Set<Int> {
+        if (board.cells[row][col].value != null) return emptySet()
+        val used = mutableSetOf<Int>()
+        for (c in 0 until board.size) {
+            board.cells[row][c].value?.let { used.add(it) }
+        }
+        for (r in 0 until board.size) {
+            board.cells[r][col].value?.let { used.add(it) }
+        }
+        val startRow = (row / board.boxSize) * board.boxSize
+        val startCol = (col / board.boxSize) * board.boxSize
+        for (r in startRow until startRow + board.boxSize) {
+            for (c in startCol until startCol + board.boxSize) {
+                board.cells[r][c].value?.let { used.add(it) }
+            }
+        }
+        return (1..board.size).filter { it !in used }.toSet()
+    }
 }

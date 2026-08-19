@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.finley.android.sudoku.generator.SudokuGenerator
 import com.finley.android.sudoku.model.*
 import com.finley.android.sudoku.solver.SudokuSolver
+import com.finley.android.sudoku.util.DailyUtil
+import com.finley.android.sudoku.util.Persistence
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +43,16 @@ class GameViewModel(
                 is GameIntent.PauseGame -> pauseGame()
                 is GameIntent.ResumeGame -> resumeGame()
                 is GameIntent.StartLevel -> startLevel(intent.level)
+                is GameIntent.StartDailyChallenge -> startDailyChallenge()
+                is GameIntent.StartTimedChallenge -> startTimedChallenge(intent.timeLimitSeconds)
+                is GameIntent.SetAutoEraseNotes -> {
+                    val cur = _state.value
+                    _state.value = cur.copy(autoEraseNotes = intent.enabled)
+                }
+                is GameIntent.SetShowConflicts -> {
+                    val cur = _state.value
+                    _state.value = cur.copy(showConflicts = intent.enabled)
+                }
             }
         }
     }
@@ -51,45 +63,110 @@ class GameViewModel(
             while (true) {
                 delay(1000)
                 if (!_state.value.isPaused && !_state.value.isCompleted && !_state.value.isLoading) {
-                    _state.value = _state.value.copy(elapsedSeconds = _state.value.elapsedSeconds + 1)
+                    val elapsed = _state.value.elapsedSeconds + 1
+                    val timeLimit = _state.value.timeLimitSeconds
+                    if (timeLimit != null && elapsed >= timeLimit) {
+                        // Time's up: mark as completed-with-game-over.
+                        recordGameLoss()
+                        _state.value = _state.value.copy(
+                            elapsedSeconds = timeLimit,
+                            isCompleted = false
+                        )
+                        _effects.send(GameEffect.ShowGameOverDialog)
+                        break
+                    }
+                    _state.value = _state.value.copy(elapsedSeconds = elapsed)
                 }
             }
         }
     }
 
+    private fun recordGameLoss() {
+        val difficulty = _state.value.difficulty
+        Persistence.recordGame(difficulty, won = false, score = 0)
+    }
+
     private fun startNewGame() {
-        startLevel(_state.value.level)
+        when (_state.value.gameMode) {
+            GameMode.DAILY -> startDailyChallenge()
+            GameMode.TIMED -> startTimedChallenge(_state.value.timeLimitSeconds ?: DEFAULT_TIME_LIMIT)
+            GameMode.NORMAL -> startLevel(_state.value.level)
+        }
     }
 
     private fun startLevel(level: Int) {
-        _state.value = _state.value.copy(isLoading = true, level = level)
+        _state.value = _state.value.copy(isLoading = true, level = level, gameMode = GameMode.NORMAL)
         viewModelScope.launch {
-            // Map level to difficulty: 1-10 Easy, 11-20 Medium, etc.
             val difficulty = GameRules.getDifficultyForLevel(level)
-            // Use level as seed for deterministic level generation
             val puzzle = generator.generatePuzzle(difficulty, seed = level.toLong())
-            val board = parsePuzzleToBoard(puzzle)
-            
-            _state.value = _state.value.copy(
-                board = board,
-                solution = puzzle.solution,
-                difficulty = puzzle.difficulty,
-                isLoading = false,
-                isCompleted = false,
-                mistakeCount = 0,
-                maxMistakes = 5,
-                hintsRemaining = GameRules.getInitialHintsForLevel(level),
-                selectedCell = null,
-                elapsedSeconds = 0,
-                history = emptyList(),
-                historyCursor = -1,
-                canUndo = false,
-                canRedo = false,
-                completedNumbers = calculateCompletedNumbers(board),
-                conflictingCells = emptySet()
-            )
-            startTimer()
+            loadPuzzle(puzzle, level = level)
         }
+    }
+
+    private fun startDailyChallenge() {
+        val dateKey = DailyUtil.todayDateKey()
+        _state.value = _state.value.copy(
+            isLoading = true,
+            gameMode = GameMode.DAILY,
+            dailyDate = dateKey
+        )
+        viewModelScope.launch {
+            val difficulty = GameRules.getDifficultyForLevel(DAILY_LEVEL)
+            val puzzle = generator.generatePuzzle(difficulty, seed = DailyUtil.dailySeed(dateKey))
+            loadPuzzle(puzzle, level = DAILY_LEVEL)
+        }
+    }
+
+    private fun startTimedChallenge(timeLimitSeconds: Int) {
+        _state.value = _state.value.copy(
+            isLoading = true,
+            gameMode = GameMode.TIMED,
+            timeLimitSeconds = timeLimitSeconds
+        )
+        viewModelScope.launch {
+            val difficulty = GameRules.getDifficultyForLevel(TIMED_BASE_LEVEL)
+            val puzzle = generator.generatePuzzle(difficulty, seed = TIMED_BASE_LEVEL.toLong())
+            loadPuzzle(puzzle, level = TIMED_BASE_LEVEL)
+        }
+    }
+
+    private fun loadPuzzle(puzzle: Puzzle, level: Int) {
+        val board = parsePuzzleToBoard(puzzle)
+        val dailyDate = _state.value.dailyDate
+        _state.value = _state.value.copy(
+            board = board,
+            solution = puzzle.solution,
+            level = level,
+            dailyDate = dailyDate,
+            difficulty = puzzle.difficulty,
+            isLoading = false,
+            isCompleted = false,
+            mistakeCount = 0,
+            maxMistakes = 5,
+            comboCount = 0,
+            hintsRemaining = GameRules.getInitialHintsForLevel(level),
+            selectedCell = null,
+            elapsedSeconds = 0,
+            history = emptyList(),
+            historyCursor = -1,
+            canUndo = false,
+            canRedo = false,
+            completedNumbers = calculateCompletedNumbers(board),
+            conflictingCells = emptySet(),
+            hintCell = null,
+            activeNumber = null,
+            nakedSingleCell = null,
+            nakedSingleValue = null,
+            autoEraseNotes = Persistence.getAutoEraseNotes(),
+            showConflicts = Persistence.getShowConflicts()
+        )
+        startTimer()
+    }
+
+    private companion object {
+        const val DEFAULT_TIME_LIMIT = 600
+        const val DAILY_LEVEL = 12 // MEDIUM difficulty
+        const val TIMED_BASE_LEVEL = 8 // EASY difficulty
     }
 
     private fun parsePuzzleToBoard(puzzle: Puzzle): Board {
@@ -107,10 +184,31 @@ class GameViewModel(
     }
 
     private fun selectCell(row: Int, col: Int) {
-        _state.value = _state.value.copy(selectedCell = row to col)
+        val cell = _state.value.board.cells.getOrNull(row)?.getOrNull(col)
+        _state.value = _state.value.copy(
+            selectedCell = row to col,
+            activeNumber = cell?.value,
+            nakedSingleCell = if (cell?.value == null) recomputeNakedSingleCell(_state.value.board, row to col) else null,
+            nakedSingleValue = if (cell?.value == null) recomputeNakedSingleValue(_state.value.board, row to col) else null
+        )
+    }
+
+    private fun recomputeNakedSingleCell(board: Board, selectedCell: Pair<Int, Int>?): Pair<Int, Int>? {
+        val (r, c) = selectedCell ?: return null
+        val cell = board.cells.getOrNull(r)?.getOrNull(c) ?: return null
+        if (cell.value != null) return null
+        return if (solver.getCandidates(board, r, c).size == 1) r to c else null
+    }
+
+    private fun recomputeNakedSingleValue(board: Board, selectedCell: Pair<Int, Int>?): Int? {
+        val (r, c) = selectedCell ?: return null
+        val cell = board.cells.getOrNull(r)?.getOrNull(c) ?: return null
+        if (cell.value != null) return null
+        return solver.getCandidates(board, r, c).singleOrNull()
     }
 
     private fun inputNumber(value: Int) {
+        _state.value = _state.value.copy(activeNumber = value)
         val selected = _state.value.selectedCell ?: return
         val (r, c) = selected
         val cell = _state.value.board.cells[r][c]
@@ -152,19 +250,24 @@ class GameViewModel(
         }
         
         var newMistakeCount = _state.value.mistakeCount
+        var newComboCount = _state.value.comboCount
         if (!isValid) {
             newMistakeCount++
+            newComboCount = 0
             viewModelScope.launch {
                 _effects.send(GameEffect.PlaySoundError)
                 if (newMistakeCount >= _state.value.maxMistakes) {
+                    recordGameLoss()
                     _effects.send(GameEffect.ShowGameOverDialog)
                 }
             }
+        } else {
+            newComboCount++
         }
 
         val newBoard = _state.value.board.copy(cells = newCells)
         val previouslyCompleted = _state.value.completedNumbers
-        updateStateWithMove(move, newBoard, newMistakeCount, conflicts)
+        updateStateWithMove(move, newBoard, newMistakeCount, conflicts, newComboCount)
         
         val nowCompleted = _state.value.completedNumbers
         val justCompleted = nowCompleted - previouslyCompleted
@@ -176,6 +279,12 @@ class GameViewModel(
         }
 
         if (newMistakeCount < _state.value.maxMistakes && isBoardFullAndValid(newCells)) {
+            if (_state.value.gameMode == GameMode.DAILY) {
+                val dateKey = DailyUtil.todayDateKey()
+                Persistence.saveDailyCompleted(dateKey)
+            }
+            val score = calculateScore(_state.value.copy(isCompleted = true))
+            Persistence.recordGame(_state.value.difficulty, won = true, score = score)
             _state.value = _state.value.copy(isCompleted = true)
             viewModelScope.launch {
                 _effects.send(GameEffect.ShowVictoryDialog)
@@ -187,7 +296,8 @@ class GameViewModel(
         move: Move, 
         newBoard: Board, 
         mistakeCount: Int? = null,
-        conflicts: Set<Pair<Int, Int>> = emptySet()
+        conflicts: Set<Pair<Int, Int>> = emptySet(),
+        comboCount: Int? = null
     ) {
         val currentState = _state.value
         val newHistory = currentState.history.take(currentState.historyCursor + 1) + move
@@ -196,12 +306,15 @@ class GameViewModel(
         _state.value = currentState.copy(
             board = newBoard,
             mistakeCount = mistakeCount ?: currentState.mistakeCount,
+            comboCount = comboCount ?: currentState.comboCount,
             history = newHistory,
             historyCursor = newCursor,
             canUndo = true,
             canRedo = false,
             completedNumbers = calculateCompletedNumbers(newBoard),
-            conflictingCells = conflicts
+            conflictingCells = conflicts,
+            nakedSingleCell = recomputeNakedSingleCell(newBoard, currentState.selectedCell),
+            nakedSingleValue = recomputeNakedSingleValue(newBoard, currentState.selectedCell)
         )
     }
 
@@ -276,7 +389,9 @@ class GameViewModel(
             historyCursor = newCursor,
             canUndo = newCursor >= 0,
             canRedo = true,
-            selectedCell = move.row to move.col
+            selectedCell = move.row to move.col,
+            nakedSingleCell = recomputeNakedSingleCell(newBoard, move.row to move.col),
+            nakedSingleValue = recomputeNakedSingleValue(newBoard, move.row to move.col)
         )
     }
 
@@ -293,7 +408,9 @@ class GameViewModel(
             historyCursor = newCursor,
             canUndo = true,
             canRedo = newCursor < currentState.history.lastIndex,
-            selectedCell = move.row to move.col
+            selectedCell = move.row to move.col,
+            nakedSingleCell = recomputeNakedSingleCell(newBoard, move.row to move.col),
+            nakedSingleValue = recomputeNakedSingleValue(newBoard, move.row to move.col)
         )
     }
 
@@ -369,8 +486,15 @@ class GameViewModel(
             history = newHistory,
             historyCursor = newHistory.lastIndex,
             canUndo = true,
-            canRedo = false
+            canRedo = false,
+            hintCell = cellToFill.row to cellToFill.col,
+            completedNumbers = calculateCompletedNumbers(newBoard)
         )
+
+        viewModelScope.launch {
+            delay(1800)
+            _state.value = _state.value.copy(hintCell = null)
+        }
         
         if (isBoardFullAndValid(newCells)) {
             _state.value = _state.value.copy(isCompleted = true)
