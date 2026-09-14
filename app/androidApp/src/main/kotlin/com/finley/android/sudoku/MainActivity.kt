@@ -18,6 +18,9 @@ class MainActivity : ComponentActivity() {
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
         
         enableEdgeToEdge()
+        // Prevent the system from adding a translucent scrim to the navigation
+        // bar so the app's edge-to-edge background shows through it.
+        window.isNavigationBarContrastEnforced = false
 
         setContent {
             App()
