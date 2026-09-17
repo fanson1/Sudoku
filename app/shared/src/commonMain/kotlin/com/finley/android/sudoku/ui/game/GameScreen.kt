@@ -1470,34 +1470,6 @@ private fun DialogEntrance(
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-fun formatTime(seconds: Int): String {
-    val mins = seconds / 60
-    val secs = seconds % 60
-    return "${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}"
-}
-
-fun calculateScore(state: GameState): Int {
-    val baseScore = when (state.difficulty) {
-        Difficulty.EASY -> 1000
-        Difficulty.MEDIUM -> 2000
-        Difficulty.HARD -> 3000
-        Difficulty.EXPERT -> 5000
-        Difficulty.MASTER -> 8000
-    }
-
-    val timePenalty = state.elapsedSeconds * 2
-    val mistakePenalty = state.mistakeCount * 100
-
-    // Combo multiplier: each mistake-free move extends a streak that
-    // boosts the final score, rewarding consecutive smart placements.
-    val comboMultiplier = 1.0 + (state.comboCount * 0.05).coerceIn(0.0, 1.0)
-
-    return ((baseScore - timePenalty - mistakePenalty) * comboMultiplier).toInt().coerceAtLeast(100)
-}
-
-// ---------------------------------------------------------------------------
 // Previews
 // ---------------------------------------------------------------------------
 @Composable

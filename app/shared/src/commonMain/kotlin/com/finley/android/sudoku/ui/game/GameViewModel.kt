@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlin.random.Random
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -98,6 +99,10 @@ class GameViewModel(
         _state.value = _state.value.copy(isLoading = true, level = level, gameMode = GameMode.NORMAL)
         viewModelScope.launch {
             val difficulty = GameRules.getDifficultyForLevel(level)
+            // Level-based puzzles are deterministic per level on purpose: the
+            // same level always shows the same board, which keeps per-level
+            // leaderboard scores comparable. "Restart" therefore replays the
+            // exact same puzzle.
             val puzzle = generator.generatePuzzle(difficulty, seed = level.toLong())
             loadPuzzle(puzzle, level = level)
         }
@@ -125,7 +130,9 @@ class GameViewModel(
         )
         viewModelScope.launch {
             val difficulty = GameRules.getDifficultyForLevel(TIMED_BASE_LEVEL)
-            val puzzle = generator.generatePuzzle(difficulty, seed = TIMED_BASE_LEVEL.toLong())
+            // Timed runs are randomized (not seeded by level) so every attempt
+            // presents a fresh puzzle.
+            val puzzle = generator.generatePuzzle(difficulty, seed = Random.nextLong())
             loadPuzzle(puzzle, level = TIMED_BASE_LEVEL)
         }
     }
@@ -278,17 +285,8 @@ class GameViewModel(
             }
         }
 
-        if (newMistakeCount < _state.value.maxMistakes && isBoardFullAndValid(newCells)) {
-            if (_state.value.gameMode == GameMode.DAILY) {
-                val dateKey = DailyUtil.todayDateKey()
-                Persistence.saveDailyCompleted(dateKey)
-            }
-            val score = calculateScore(_state.value.copy(isCompleted = true))
-            Persistence.recordGame(_state.value.difficulty, won = true, score = score)
-            _state.value = _state.value.copy(isCompleted = true)
-            viewModelScope.launch {
-                _effects.send(GameEffect.ShowVictoryDialog)
-            }
+        if (newMistakeCount < _state.value.maxMistakes) {
+            handleBoardCompletion(newCells)
         }
     }
 
@@ -379,10 +377,9 @@ class GameViewModel(
         val move = currentState.history[currentState.historyCursor]
         val newBoard = applyMove(currentState.board, move, undo = true)
         val newCursor = currentState.historyCursor - 1
-        
-        // If the move being undone was an error, we should ideally decrement mistake count
-        // However, standard Sudoku apps usually don't "refund" mistakes on undo.
-        // For now, let's keep it simple.
+
+        // Standard Sudoku apps don't "refund" mistakes on undo; the isError
+        // flags of the affected cells are recomputed by applyMove instead.
 
         _state.value = currentState.copy(
             board = newBoard,
@@ -390,6 +387,8 @@ class GameViewModel(
             canUndo = newCursor >= 0,
             canRedo = true,
             selectedCell = move.row to move.col,
+            conflictingCells = emptySet(),
+            completedNumbers = calculateCompletedNumbers(newBoard),
             nakedSingleCell = recomputeNakedSingleCell(newBoard, move.row to move.col),
             nakedSingleValue = recomputeNakedSingleValue(newBoard, move.row to move.col)
         )
@@ -409,6 +408,8 @@ class GameViewModel(
             canUndo = true,
             canRedo = newCursor < currentState.history.lastIndex,
             selectedCell = move.row to move.col,
+            conflictingCells = emptySet(),
+            completedNumbers = calculateCompletedNumbers(newBoard),
             nakedSingleCell = recomputeNakedSingleCell(newBoard, move.row to move.col),
             nakedSingleValue = recomputeNakedSingleValue(newBoard, move.row to move.col)
         )
@@ -460,26 +461,26 @@ class GameViewModel(
         val currentState = _state.value
         if (currentState.hintsRemaining <= 0 || currentState.isCompleted) return
 
-        val emptyCells = currentState.board.cells.flatten().filter { it.value == null }
-        if (emptyCells.isEmpty()) return
+        val hintCell = findHintCell(currentState.board, currentState.solution) ?: return
+        val (r, c) = hintCell
+        val cell = currentState.board.cells[r][c]
+        val correctValue = currentState.solution[r * currentState.board.size + c].digitToInt()
 
-        val cellToFill = emptyCells.random()
-        val solution = currentState.solution
-        val correctValue = solution[cellToFill.row * currentState.board.size + cellToFill.col].digitToInt()
-
-        val move = Move.Place(cellToFill.row, cellToFill.col, correctValue, cellToFill.value)
+        val move = Move.Place(r, c, correctValue, cell.value)
 
         val newCells = currentState.board.cells.mapIndexed { ri, row ->
             row.mapIndexed { ci, cell ->
-                if (ri == cellToFill.row && ci == cellToFill.col) {
-                    cell.copy(value = correctValue, isGiven = true) // Treat hint as given
+                if (ri == r && ci == c) {
+                    // A hint fills the value but the cell stays fully editable
+                    // (not treated as a given clue) so it can still be undone/erased.
+                    cell.copy(value = correctValue, isError = false, isGiven = cell.isGiven)
                 } else cell
             }
         }
 
         val newBoard = currentState.board.copy(cells = newCells)
         val newHistory = currentState.history.take(currentState.historyCursor + 1) + move
-        
+
         _state.value = currentState.copy(
             board = newBoard,
             hintsRemaining = currentState.hintsRemaining - 1,
@@ -487,19 +488,90 @@ class GameViewModel(
             historyCursor = newHistory.lastIndex,
             canUndo = true,
             canRedo = false,
-            hintCell = cellToFill.row to cellToFill.col,
-            completedNumbers = calculateCompletedNumbers(newBoard)
+            hintCell = r to c,
+            conflictingCells = emptySet(),
+            completedNumbers = calculateCompletedNumbers(newBoard),
+            nakedSingleCell = recomputeNakedSingleCell(newBoard, currentState.selectedCell),
+            nakedSingleValue = recomputeNakedSingleValue(newBoard, currentState.selectedCell)
         )
 
         viewModelScope.launch {
             delay(1800)
             _state.value = _state.value.copy(hintCell = null)
         }
-        
+
         if (isBoardFullAndValid(newCells)) {
-            _state.value = _state.value.copy(isCompleted = true)
+            handleBoardCompletion(newCells)
         }
     }
+
+    /**
+     * Picks the most instructive empty cell for a hint:
+     * 1. a naked single (exactly one legal candidate),
+     * 2. a hidden single (a digit with only one home in its row/col/box),
+     * 3. any empty cell whose solution value does not conflict with the board.
+     */
+    private fun findHintCell(board: Board, solution: String): Pair<Int, Int>? {
+        val empties = (0 until board.size).flatMap { r ->
+            (0 until board.size).mapNotNull { c ->
+                if (board.cells[r][c].value == null) r to c else null
+            }
+        }
+        if (empties.isEmpty()) return null
+
+        empties.firstOrNull { (r, c) -> solver.getCandidates(board, r, c).size == 1 }?.let { return it }
+        empties.firstOrNull { (r, c) -> findHiddenSingleValue(board, r, c) != null }?.let { return it }
+        return empties.firstOrNull { (r, c) ->
+            val v = solution[r * board.size + c].digitToInt()
+            solver.getConflictingCells(board, r, c, v).isEmpty()
+        } ?: empties.first()
+    }
+
+    /** Returns the digit that only fits in this cell within its row/col/box, or null. */
+    private fun findHiddenSingleValue(board: Board, row: Int, col: Int): Int? {
+        val candidates = solver.getCandidates(board, row, col)
+        if (candidates.isEmpty()) return null
+
+        val rowBlocked: (Int) -> Boolean = { d ->
+            (0 until board.size).any { cc ->
+                cc != col && board.cells[row][cc].value == null && d in solver.getCandidates(board, row, cc)
+            }
+        }
+        val colBlocked: (Int) -> Boolean = { d ->
+            (0 until board.size).any { rr ->
+                rr != row && board.cells[rr][col].value == null && d in solver.getCandidates(board, rr, col)
+            }
+        }
+        val boxBlocked: (Int) -> Boolean = { d ->
+            val startRow = (row / board.boxSize) * board.boxSize
+            val startCol = (col / board.boxSize) * board.boxSize
+            (startRow until startRow + board.boxSize).any { rr ->
+                (startCol until startCol + board.boxSize).any { cc ->
+                    (rr != row || cc != col) &&
+                        board.cells[rr][cc].value == null &&
+                        d in solver.getCandidates(board, rr, cc)
+                }
+            }
+        }
+
+        return candidates.firstOrNull { d -> !rowBlocked(d) && !colBlocked(d) && !boxBlocked(d) }
+    }
+
+    /** Shared win-path so both manual input and hints settle a completed board identically. */
+    private fun handleBoardCompletion(newCells: List<List<Cell>>) {
+        val current = _state.value
+        if (current.isCompleted || current.mistakeCount >= current.maxMistakes) return
+        if (!isBoardFullAndValid(newCells)) return
+
+        if (current.gameMode == GameMode.DAILY) {
+            Persistence.saveDailyCompleted(DailyUtil.todayDateKey())
+        }
+        val score = calculateScore(current.copy(isCompleted = true))
+        Persistence.recordGame(current.difficulty, won = true, score = score)
+        _state.value = current.copy(isCompleted = true)
+        viewModelScope.launch { _effects.send(GameEffect.ShowVictoryDialog) }
+    }
+
     private fun pauseGame() { _state.value = _state.value.copy(isPaused = true) }
     private fun resumeGame() { _state.value = _state.value.copy(isPaused = false) }
 }

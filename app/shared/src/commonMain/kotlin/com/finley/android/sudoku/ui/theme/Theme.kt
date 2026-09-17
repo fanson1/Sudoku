@@ -8,10 +8,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-enum class ThemeMode(val label: String) {
-    SYSTEM("跟随系统"),
-    LIGHT("浅色"),
-    DARK("深色")
+enum class ThemeMode {
+    SYSTEM,
+    LIGHT,
+    DARK
 }
 
 private val LightColors = lightColorScheme(

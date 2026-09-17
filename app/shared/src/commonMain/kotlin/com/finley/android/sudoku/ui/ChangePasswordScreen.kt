@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import com.finley.android.sudoku.network.NetworkService
 import com.finley.android.sudoku.ui.components.AppScreenBackground
 import com.finley.android.sudoku.ui.components.GradientButton
+import com.finley.android.sudoku.ui.i18n.LocalAppStrings
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,12 +33,13 @@ fun ChangePasswordScreen(
     var isLoading by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+    val strings = LocalAppStrings.current
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("修改密码", fontWeight = FontWeight.Bold) },
+                title = { Text(strings.changePasswordTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -69,7 +71,7 @@ fun ChangePasswordScreen(
                         OutlinedTextField(
                             value = oldPassword,
                             onValueChange = { oldPassword = it; message = null },
-                            label = { Text("当前密码") },
+                            label = { Text(strings.currentPassword) },
                             leadingIcon = { Icon(Icons.Default.Lock, null) },
                             visualTransformation = PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth(),
@@ -82,7 +84,7 @@ fun ChangePasswordScreen(
                         OutlinedTextField(
                             value = newPassword,
                             onValueChange = { newPassword = it; message = null },
-                            label = { Text("新密码") },
+                            label = { Text(strings.newPassword) },
                             leadingIcon = { Icon(Icons.Default.Lock, null) },
                             visualTransformation = PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth(),
@@ -91,7 +93,7 @@ fun ChangePasswordScreen(
                         )
 
                         Text(
-                            text = "新密码至少 6 位，建议混合字母和数字",
+                            text = strings.passwordHintRule,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp)
@@ -106,12 +108,12 @@ fun ChangePasswordScreen(
                                     val success = NetworkService.changePassword(oldPassword, newPassword)
                                     isLoading = false
                                     if (success) {
-                                        message = "密码修改成功!"
+                                        message = strings.passwordChangeSuccess
                                         oldPassword = ""
                                         newPassword = ""
                                         isError = false
                                     } else {
-                                        message = "修改失败，请检查当前密码"
+                                        message = strings.passwordChangeFailed
                                         isError = true
                                     }
                                 }
@@ -127,7 +129,7 @@ fun ChangePasswordScreen(
                                     strokeWidth = 2.dp
                                 )
                             } else {
-                                Text("更新密码", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Text(strings.updatePassword, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

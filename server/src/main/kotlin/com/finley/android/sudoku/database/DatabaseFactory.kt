@@ -29,9 +29,12 @@ object ScoresTable : Table("scores") {
 
 object DatabaseFactory {
     fun init() {
-        val driverClassName = "org.h2.Driver"
         // 添加 AUTO_SERVER=TRUE 允许 H2 数据库被多个进程（如 IDE 的 DB 浏览器）同时访问，防止文件锁定
-        val jdbcURL = "jdbc:h2:file:./build/db;AUTO_SERVER=TRUE"
+        init("jdbc:h2:file:./build/db;AUTO_SERVER=TRUE")
+    }
+
+    fun init(jdbcURL: String) {
+        val driverClassName = "org.h2.Driver"
         val database = Database.connect(jdbcURL, driverClassName)
         
         transaction(database) {

@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.sp
 import com.finley.android.sudoku.network.NetworkService
 import com.finley.android.sudoku.ui.components.AppScreenBackground
 import com.finley.android.sudoku.ui.components.GradientButton
+import com.finley.android.sudoku.ui.i18n.LocalAppStrings
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,12 +31,13 @@ fun EditProfileScreen(
     var isLoading by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+    val strings = LocalAppStrings.current
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("编辑资料", fontWeight = FontWeight.Bold) },
+                title = { Text(strings.editProfileTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -65,12 +67,12 @@ fun EditProfileScreen(
                 ) {
                     Column(modifier = Modifier.padding(24.dp)) {
                         Text(
-                            text = "修改用户名",
+                            text = strings.changeUsernameTitle,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "新用户名将在所有设备上同步",
+                            text = strings.newUsernameSyncsAcrossDevices,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
@@ -79,7 +81,7 @@ fun EditProfileScreen(
                         OutlinedTextField(
                             value = username,
                             onValueChange = { username = it; message = null },
-                            label = { Text("用户名") },
+                            label = { Text(strings.usernameLabel) },
                             leadingIcon = { Icon(Icons.Default.Person, null) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
@@ -94,7 +96,7 @@ fun EditProfileScreen(
                                 scope.launch {
                                     val success = NetworkService.updateProfile(username)
                                     isLoading = false
-                                    message = if (success) "资料更新成功!" else "更新失败，请稍后再试"
+                                    message = if (success) strings.profileUpdateSuccess else strings.profileUpdateFailed
                                     isError = !success
                                 }
                             },
@@ -109,7 +111,7 @@ fun EditProfileScreen(
                                     strokeWidth = 2.dp
                                 )
                             } else {
-                                Text("保存修改", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Text(strings.saveChanges, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

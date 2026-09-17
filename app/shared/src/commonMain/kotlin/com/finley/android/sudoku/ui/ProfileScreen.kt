@@ -29,6 +29,7 @@ import com.finley.android.sudoku.network.NetworkService
 import com.finley.android.sudoku.ui.components.AppScreenBackground
 import com.finley.android.sudoku.ui.components.GradientButton
 import com.finley.android.sudoku.ui.components.pressScale
+import com.finley.android.sudoku.ui.i18n.LocalAppStrings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,12 +40,13 @@ fun ProfileScreen(
     onLogout: () -> Unit
 ) {
     val currentUser = NetworkService.currentUser
+    val strings = LocalAppStrings.current
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("个人中心", fontWeight = FontWeight.Bold) },
+                title = { Text(strings.profileTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -106,7 +108,7 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = currentUser?.username ?: "游客",
+                    text = currentUser?.username ?: strings.guest,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -115,7 +117,7 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 PillBadgeCompat(
-                    text = "已解锁 ${currentUser?.unlockedLevel ?: 1} 关",
+                    text = strings.levelsUnlocked(currentUser?.unlockedLevel ?: 1),
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
@@ -130,19 +132,19 @@ fun ProfileScreen(
                     ProfileStatCard(
                         icon = Icons.Default.MilitaryTech,
                         value = "${currentUser?.unlockedLevel ?: 1}",
-                        label = "最高关卡",
+                        label = strings.maxLevelLabel,
                         modifier = Modifier.weight(1f)
                     )
                     ProfileStatCard(
                         icon = Icons.Default.EmojiEvents,
                         value = "—",
-                        label = "全球排名",
+                        label = strings.globalRankLabel,
                         modifier = Modifier.weight(1f)
                     )
                     ProfileStatCard(
                         icon = Icons.Default.Person,
-                        value = "在线",
-                        label = "账号状态",
+                        value = strings.onlineStatus,
+                        label = strings.accountStatusLabel,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -158,8 +160,8 @@ fun ProfileScreen(
                     Column {
                         ProfileOptionItem(
                             icon = Icons.Default.Edit,
-                            title = "修改用户名",
-                            subtitle = "更新你的显示名称",
+                            title = strings.changeUsernameTitle,
+                            subtitle = strings.changeUsernameSubtitle,
                             onClick = onEditUsername
                         )
                         HorizontalDivider(
@@ -169,8 +171,8 @@ fun ProfileScreen(
                         )
                         ProfileOptionItem(
                             icon = Icons.Default.Lock,
-                            title = "修改密码",
-                            subtitle = "定期更换密码更安全",
+                            title = strings.changePasswordTitle,
+                            subtitle = strings.changePasswordSubtitle,
                             onClick = onChangePassword
                         )
                     }
@@ -191,7 +193,7 @@ fun ProfileScreen(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Logout, null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("退出登录", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(strings.logout, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))

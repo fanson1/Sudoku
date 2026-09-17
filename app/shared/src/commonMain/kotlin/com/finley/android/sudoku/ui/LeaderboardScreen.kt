@@ -27,6 +27,7 @@ import com.finley.android.sudoku.network.NetworkService
 import com.finley.android.sudoku.ui.components.AppScreenBackground
 import com.finley.android.sudoku.ui.components.ShimmerBox
 import com.finley.android.sudoku.ui.components.pressScale
+import com.finley.android.sudoku.ui.i18n.LocalAppStrings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +35,7 @@ fun LeaderboardScreen(onBack: () -> Unit) {
     var entries by remember { mutableStateOf<List<LeaderboardEntry>>(emptyList()) }
     var userRank by remember { mutableStateOf<Int?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    val strings = LocalAppStrings.current
 
     LaunchedEffect(Unit) {
         val response = NetworkService.getLeaderboard()
@@ -51,7 +53,7 @@ fun LeaderboardScreen(onBack: () -> Unit) {
         modifier = Modifier.fillMaxSize(),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("排行榜", fontWeight = FontWeight.Bold) },
+                title = { Text(strings.leaderboardTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -116,13 +118,13 @@ fun LeaderboardScreen(onBack: () -> Unit) {
                             }
                             Spacer(modifier = Modifier.height(20.dp))
                             Text(
-                                text = "还没有排名",
+                                text = strings.noRankingYet,
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "快来成为第一个上榜的人吧!",
+                                text = strings.beFirstOnBoard,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 4.dp)
@@ -158,11 +160,12 @@ fun LeaderboardScreen(onBack: () -> Unit) {
 
 @Composable
 private fun LeaderboardPodium(topEntries: List<LeaderboardEntry>) {
+    val strings = LocalAppStrings.current
     val colorScheme = MaterialTheme.colorScheme
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Text(
-            text = "🏆 前三名",
+            text = strings.topThree,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 12.dp, top = 4.dp)
@@ -258,6 +261,7 @@ private fun PodiumSlot(
 
 @Composable
 fun MyRankBar(rank: Int?, username: String) {
+    val strings = LocalAppStrings.current
     val colorScheme = MaterialTheme.colorScheme
     Surface(
         color = colorScheme.surface,
@@ -277,7 +281,7 @@ fun MyRankBar(rank: Int?, username: String) {
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
-                        text = if (rank != null) "#$rank" else "-",
+                        text = if (rank != null) strings.topGlobal(rank) else strings.notOnBoard,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Black,
                         color = colorScheme.onPrimary
@@ -287,18 +291,18 @@ fun MyRankBar(rank: Int?, username: String) {
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "$username (我)",
+                    text = strings.me(username),
                     fontWeight = FontWeight.Bold,
                     color = colorScheme.onSurface
                 )
                 Text(
-                    text = if (rank != null) "已进入全球前 ${(rank)} 名" else "尚未上榜",
+                    text = if (rank != null) strings.topGlobal(rank) else strings.notOnBoard,
                     fontSize = 12.sp,
                     color = colorScheme.onSurfaceVariant
                 )
             }
             Text(
-                text = "继续加油!",
+                text = strings.keepGoing,
                 style = MaterialTheme.typography.labelMedium,
                 color = colorScheme.secondary,
                 fontWeight = FontWeight.SemiBold
@@ -357,12 +361,11 @@ fun LeaderboardRow(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
+Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = entry.username,
-                fontSize = 16.sp,
-                fontWeight = if (isCurrentUser) FontWeight.Black else FontWeight.SemiBold,
-                color = if (isCurrentUser) colorScheme.primary else colorScheme.onSurface
+                text = strings.levelEntry(entry.level),
+                fontSize = 12.sp,
+                color = colorScheme.onSurfaceVariant
             )
             Text(
                 text = "关卡 ${entry.level}",

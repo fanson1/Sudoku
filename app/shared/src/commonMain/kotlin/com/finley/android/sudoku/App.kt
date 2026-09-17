@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.finley.android.sudoku.ui.i18n.LocalAppStrings
+import com.finley.android.sudoku.ui.i18n.appStringsFor
+import com.finley.android.sudoku.ui.i18n.platformLanguageCode
 import com.finley.android.sudoku.ui.WelcomeScreen
 import com.finley.android.sudoku.ui.LoginScreen
 import com.finley.android.sudoku.ui.ProfileScreen
@@ -48,10 +51,13 @@ enum class Screen {
 fun App() {
     var themeMode by remember { mutableStateOf(Persistence.getThemeMode()) }
 
+    val appStrings = remember { appStringsFor(platformLanguageCode().lowercase()) }
+
     AppTheme(themeMode = themeMode) {
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
+        CompositionLocalProvider(LocalAppStrings provides appStrings) {
+            Box(
+                modifier = Modifier.fillMaxSize()
+            ) {
             val navigationStack = remember { mutableStateListOf(Screen.WELCOME) }
             val currentScreen = navigationStack.lastOrNull() ?: Screen.WELCOME
 
@@ -237,4 +243,5 @@ fun App() {
             }
         }
     }
+}
 }

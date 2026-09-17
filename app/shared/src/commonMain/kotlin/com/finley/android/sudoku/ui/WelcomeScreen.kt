@@ -33,6 +33,7 @@ import com.finley.android.sudoku.ui.components.AppLogo
 import com.finley.android.sudoku.ui.components.AppScreenBackground
 import com.finley.android.sudoku.ui.components.GhostButton
 import com.finley.android.sudoku.ui.components.GradientButton
+import com.finley.android.sudoku.ui.i18n.LocalAppStrings
 
 @Composable
 fun WelcomeScreen(
@@ -41,6 +42,7 @@ fun WelcomeScreen(
 ) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
+    val strings = LocalAppStrings.current
 
     AppScreenBackground {
         Column(
@@ -78,7 +80,7 @@ fun WelcomeScreen(
                         )
                     )
                     Text(
-                        text = "全平台数独 · 挑战你的大脑",
+                        text = strings.welcomeTagline,
                         fontSize = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp)
@@ -87,9 +89,9 @@ fun WelcomeScreen(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FeatureChip("多端同步", Icons.Default.CloudSync)
-                        FeatureChip("全球排行", Icons.Default.EmojiEvents)
-                        FeatureChip("全平台", Icons.Default.PhoneAndroid)
+                        FeatureChip(strings.featureSync, Icons.Default.CloudSync)
+                        FeatureChip(strings.featureLeaderboard, Icons.Default.EmojiEvents)
+                        FeatureChip(strings.featureCrossPlatform, Icons.Default.PhoneAndroid)
                     }
                 }
             }
@@ -111,7 +113,7 @@ fun WelcomeScreen(
                         height = 58.dp
                     ) {
                         Text(
-                            text = "单机模式",
+                            text = strings.standaloneMode,
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -134,7 +136,7 @@ fun WelcomeScreen(
                         height = 58.dp
                     ) {
                         Text(
-                            text = "联网模式 · 登录同步进度",
+                            text = strings.onlineMode,
                             fontSize = 17.sp,
                             fontWeight = FontWeight.SemiBold
                         )

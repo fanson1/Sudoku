@@ -31,6 +31,7 @@ import com.finley.android.sudoku.ui.components.AppLogo
 import com.finley.android.sudoku.ui.components.AppScreenBackground
 import com.finley.android.sudoku.ui.components.GhostButton
 import com.finley.android.sudoku.ui.components.GradientButton
+import com.finley.android.sudoku.ui.i18n.LocalAppStrings
 import kotlinx.coroutines.launch
 
 @Composable
@@ -46,10 +47,11 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+    val strings = LocalAppStrings.current
 
     fun submit() {
         if (username.isBlank() || password.isBlank()) {
-            errorMessage = "请填写所有字段"
+            errorMessage = strings.fillAllFields
             return
         }
         isLoading = true
@@ -66,7 +68,7 @@ fun LoginScreen(
             if (response.success) {
                 onLoginSuccess()
             } else {
-                errorMessage = response.message ?: "认证失败"
+                errorMessage = response.message ?: strings.authFailed
             }
         }
     }
@@ -99,13 +101,13 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = if (isRegisterMode) "创建账号" else "欢迎回来",
+                text = if (isRegisterMode) strings.createAccountTitle else strings.welcomeBackTitle,
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = if (isRegisterMode) "加入全球数独社区" else "登录以同步你的进度",
+                text = if (isRegisterMode) strings.createAccountSubtitle else strings.signInSubtitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 28.dp)
@@ -124,8 +126,8 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = username,
                         onValueChange = { username = it; errorMessage = null },
-                        label = { Text("用户名") },
-                        placeholder = { Text("请输入用户名") },
+                        label = { Text(strings.usernameLabel) },
+                        placeholder = { Text(strings.usernamePlaceholder) },
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = { Icon(Icons.Default.Person, null) },
                         shape = RoundedCornerShape(16.dp),
@@ -139,8 +141,8 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it; errorMessage = null },
-                        label = { Text("密码") },
-                        placeholder = { Text("请输入密码") },
+                        label = { Text(strings.passwordLabel) },
+                        placeholder = { Text(strings.passwordPlaceholder) },
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = { Icon(Icons.Default.Lock, null) },
                         trailingIcon = {
@@ -198,7 +200,7 @@ fun LoginScreen(
                             )
                         } else {
                             Text(
-                                text = if (isRegisterMode) "注册账号" else "登 录",
+                                text = if (isRegisterMode) strings.registerButton else strings.signInButton,
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -219,7 +221,7 @@ fun LoginScreen(
                 height = 46.dp
             ) {
                 Text(
-                    text = if (isRegisterMode) "已有账号？去登录" else "没有账号？立即注册",
+                    text = if (isRegisterMode) strings.goToSignIn else strings.goToRegister,
                     fontWeight = FontWeight.Medium,
                     fontSize = 14.sp
                 )

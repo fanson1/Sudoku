@@ -71,6 +71,7 @@ import com.finley.android.sudoku.ui.components.SettingsSheetContent
 import com.finley.android.sudoku.ui.components.difficultyColor
 import com.finley.android.sudoku.ui.components.difficultyLabel
 import com.finley.android.sudoku.ui.components.pressScale
+import com.finley.android.sudoku.ui.i18n.LocalAppStrings
 import com.finley.android.sudoku.ui.theme.ThemeMode
 import kotlinx.coroutines.delay
 
@@ -93,6 +94,7 @@ fun LevelSelectionScreen(
     onBack: () -> Unit
 ) {
     var showSettings by remember { mutableStateOf(false) }
+    val strings = LocalAppStrings.current
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -100,7 +102,7 @@ fun LevelSelectionScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        "选择关卡",
+                        strings.chooseLevel,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -150,17 +152,17 @@ fun LevelSelectionScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     ChallengeCard(
-                        title = "每日挑战",
-                        subtitle = if (dailyCompletedToday) "今日已完成" else "每天一道题",
+                        title = strings.dailyChallenge,
+                        subtitle = if (dailyCompletedToday) strings.dailyDoneToday else strings.dailyAnewPuzzle,
                         icon = Icons.Default.CalendarMonth,
                         badge = if (dailyCompletedToday) "✓" else null,
-                        goalLabel = if (dailyChain > 0) "连续 $dailyChain 天" else null,
+                        goalLabel = if (dailyChain > 0) strings.dailyStreak(dailyChain) else null,
                         modifier = Modifier.weight(1f),
                         onClick = onDailyChallengeClick
                     )
                     ChallengeCard(
-                        title = "限时挑战",
-                        subtitle = "10 分钟",
+                        title = strings.timedChallenge,
+                        subtitle = strings.timed10Minutes,
                         icon = Icons.Default.Timer,
                         modifier = Modifier.weight(1f),
                         onClick = onTimedChallengeClick
@@ -238,6 +240,7 @@ private fun DifficultySectionHeader(
     val diffColor = difficultyColor(difficulty)
     val total = range.count()
     val completed = range.count { it < unlockedLevels }
+    val strings = LocalAppStrings.current
 
     Column(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
         Row(
@@ -255,14 +258,14 @@ private fun DifficultySectionHeader(
             }
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = difficultyLabel(difficulty),
+                text = difficultyLabel(difficulty, strings),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = colorScheme.onSurface
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "第 ${range.first}-${range.last} 关",
+                text = strings.levelRange(range.first, range.last),
                 style = MaterialTheme.typography.labelMedium,
                 color = colorScheme.onSurfaceVariant
             )
@@ -295,6 +298,7 @@ private fun LevelProgressHeader(unlockedLevels: Int) {
     val animatedCount by animateIntAsState(unlockedLevels, label = "count")
 
     val colorScheme = MaterialTheme.colorScheme
+    val strings = LocalAppStrings.current
 
     Column(modifier = Modifier.padding(bottom = 16.dp, top = 4.dp)) {
         Row(
@@ -304,12 +308,12 @@ private fun LevelProgressHeader(unlockedLevels: Int) {
         ) {
             Column {
                 Text(
-                    text = "关卡进度",
+                    text = strings.levelProgress,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "已解锁 $animatedCount / $TOTAL_LEVELS",
+                    text = strings.unlockedProgress(animatedCount, TOTAL_LEVELS),
                     style = MaterialTheme.typography.bodySmall,
                     color = colorScheme.onSurfaceVariant
                 )
