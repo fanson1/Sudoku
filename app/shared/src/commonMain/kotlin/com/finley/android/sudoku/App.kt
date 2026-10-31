@@ -2,8 +2,6 @@ package com.finley.android.sudoku
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,227 +10,203 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.*
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.finley.android.sudoku.ui.WelcomeScreen
-import com.finley.android.sudoku.ui.LoginScreen
-import com.finley.android.sudoku.ui.ProfileScreen
-import com.finley.android.sudoku.ui.EditProfileScreen
-import com.finley.android.sudoku.ui.ChangePasswordScreen
-import com.finley.android.sudoku.ui.LeaderboardScreen
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.finley.android.sudoku.i18n.LocalStrings
+import com.finley.android.sudoku.i18n.resolveLanguage
+import com.finley.android.sudoku.i18n.stringKey
+import com.finley.android.sudoku.i18n.stringsFor
+import com.finley.android.sudoku.pro.rememberProController
 import com.finley.android.sudoku.ui.LevelSelectionScreen
+import com.finley.android.sudoku.ui.StatsScreen
+import com.finley.android.sudoku.ui.components.PaywallDialog
+import com.finley.android.sudoku.ui.components.PaywallReason
 import com.finley.android.sudoku.ui.game.GameMode
 import com.finley.android.sudoku.ui.game.GameScreen
 import com.finley.android.sudoku.ui.theme.AppTheme
-import com.finley.android.sudoku.ui.theme.ThemeMode
-import com.finley.android.sudoku.util.Persistence
-import com.finley.android.sudoku.util.DailyUtil
 import com.finley.android.sudoku.util.BackHandler
-import com.finley.android.sudoku.network.NetworkService
-import androidx.compose.ui.tooling.preview.Preview
-import kotlinx.coroutines.launch
+import com.finley.android.sudoku.util.DailyUtil
+import com.finley.android.sudoku.util.Persistence
+import com.finley.android.sudoku.util.FreeTier
 
 enum class Screen {
-    WELCOME,
-    LOGIN,
-    PROFILE,
-    EDIT_PROFILE,
-    CHANGE_PASSWORD,
-    LEVEL_SELECTION,
+    HOME,
     GAME,
-    LEADERBOARD
+    STATS
 }
 
 @Composable
 @Preview
 fun App() {
+    var language by remember { mutableStateOf(Persistence.getLanguage()) }
     var themeMode by remember { mutableStateOf(Persistence.getThemeMode()) }
+    val strings = remember(language) { stringsFor(resolveLanguage(language)) }
 
-    AppTheme(themeMode = themeMode) {
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            val navigationStack = remember { mutableStateListOf(Screen.WELCOME) }
-            val currentScreen = navigationStack.lastOrNull() ?: Screen.WELCOME
+    val pro = rememberProController()
+    val isPro by pro.isPro.collectAsStateWithLifecycle()
+    val priceLabel by pro.priceLabel.collectAsStateWithLifecycle()
+    val busy by pro.busy.collectAsStateWithLifecycle()
+    val available by pro.available.collectAsStateWithLifecycle()
+    val proMessage by pro.message.collectAsStateWithLifecycle()
 
-            var isOnlineMode by remember { mutableStateOf(false) }
-            var unlockedLevels by remember { mutableStateOf(Persistence.getUnlockedLevel()) }
-            var selectedLevel by remember { mutableStateOf(1) }
-            var selectedMode by remember { mutableStateOf(GameMode.NORMAL) }
-            var selectedTimeLimit by remember { mutableStateOf<Int?>(null) }
+    CompositionLocalProvider(LocalStrings provides strings) {
+        AppTheme(themeMode = themeMode) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                val navigationStack = remember { mutableStateListOf(Screen.HOME) }
+                val currentScreen = navigationStack.lastOrNull() ?: Screen.HOME
 
-            val scope = rememberCoroutineScope()
+                var unlockedLevels by remember { mutableIntStateOf(Persistence.getUnlockedLevel()) }
+                var selectedLevel by remember { mutableIntStateOf(1) }
+                var selectedMode by remember { mutableStateOf(GameMode.NORMAL) }
+                var selectedTimeLimit by remember { mutableStateOf<Int?>(null) }
 
-            LaunchedEffect(Unit) {
-                val savedToken = Persistence.getAuthToken()
-                val savedUsername = Persistence.getUsername()
-                if (savedToken != null && savedUsername != null) {
-                    NetworkService.setAuthToken(savedToken)
-                    scope.launch {
-                        val user = NetworkService.getUserProfile()
-                        if (user != null) {
-                            val mergedLevel = maxOf(user.unlockedLevel, unlockedLevels)
-                            unlockedLevels = mergedLevel
-                            Persistence.saveUnlockedLevel(mergedLevel)
+                var showPaywall by remember { mutableStateOf(false) }
+                var paywallReason by remember { mutableStateOf(PaywallReason.LEVELS) }
+                val snackbarHostState = remember { SnackbarHostState() }
 
-                            if (mergedLevel > user.unlockedLevel) {
-                                NetworkService.updateUnlockedLevel(mergedLevel)
-                            }
+                LaunchedEffect(proMessage) {
+                    val msg = proMessage ?: return@LaunchedEffect
+                    snackbarHostState.showSnackbar(strings[msg.stringKey()])
+                    pro.consumeMessage()
+                }
 
-                            isOnlineMode = true
-                            navigationStack.clear()
-                            navigationStack.add(Screen.LEVEL_SELECTION)
-                        } else {
-                            NetworkService.logout()
-                        }
+                val navigateBack = {
+                    if (navigationStack.size > 1) {
+                        navigationStack.removeAt(navigationStack.lastIndex)
                     }
                 }
-            }
 
-            val navigateBack = {
-                if (navigationStack.size > 1) {
-                    navigationStack.removeAt(navigationStack.size - 1)
-                }
-            }
+                BackHandler(enabled = navigationStack.size > 1) { navigateBack() }
 
-            BackHandler(enabled = navigationStack.size > 1) {
-                navigateBack()
-            }
-
-            AnimatedContent(
-                targetState = currentScreen,
-                transitionSpec = {
-                    (slideInHorizontally(tween(320)) { it / 5 } + fadeIn(tween(320)))
-                        .togetherWith(slideOutHorizontally(tween(220)) { -it / 8 } + fadeOut(tween(220)))
-                        .using(
-                            SizeTransform(clip = false)
-                        )
-                },
-                label = "screen"
-            ) { screen ->
-                when (screen) {
-                    Screen.WELCOME -> {
-                        WelcomeScreen(
-                            onStandaloneClick = {
-                                isOnlineMode = false
-                                unlockedLevels = Persistence.getUnlockedLevel()
-                                navigationStack.add(Screen.LEVEL_SELECTION)
-                            },
-                            onOnlineClick = {
-                                isOnlineMode = true
-                                if (NetworkService.currentUser != null || Persistence.getAuthToken() != null) {
-                                    navigationStack.add(Screen.LEVEL_SELECTION)
-                                } else {
-                                    navigationStack.add(Screen.LOGIN)
-                                }
-                            }
-                        )
-                    }
-                    Screen.LOGIN -> {
-                        LoginScreen(
-                            onLoginSuccess = {
-                                val user = NetworkService.currentUser
-                                if (user != null) {
-                                    val mergedLevel = maxOf(user.unlockedLevel, unlockedLevels)
-                                    unlockedLevels = mergedLevel
-                                    Persistence.saveUnlockedLevel(mergedLevel)
-
-                                    if (mergedLevel > user.unlockedLevel) {
-                                        scope.launch {
-                                            NetworkService.updateUnlockedLevel(mergedLevel)
-                                        }
-                                    }
-                                }
-                                navigationStack.removeAt(navigationStack.size - 1)
-                                navigationStack.add(Screen.LEVEL_SELECTION)
-                            },
-                            onBack = navigateBack
-                        )
-                    }
-                    Screen.PROFILE -> {
-                        ProfileScreen(
-                            onEditUsername = {
-                                navigationStack.add(Screen.EDIT_PROFILE)
-                            },
-                            onChangePassword = {
-                                navigationStack.add(Screen.CHANGE_PASSWORD)
-                            },
-                            onBack = navigateBack,
-                            onLogout = {
-                                NetworkService.logout()
-                                isOnlineMode = false
-                                unlockedLevels = 1
-                                navigationStack.clear()
-                                navigationStack.add(Screen.WELCOME)
-                            }
-                        )
-                    }
-                    Screen.EDIT_PROFILE -> {
-                        EditProfileScreen(onBack = navigateBack)
-                    }
-                    Screen.CHANGE_PASSWORD -> {
-                        ChangePasswordScreen(onBack = navigateBack)
-                    }
-                    Screen.LEVEL_SELECTION -> {
-                        LevelSelectionScreen(
+                AnimatedContent(
+                    targetState = currentScreen,
+                    transitionSpec = {
+                        (slideInHorizontally(tween(320)) { it / 5 } + fadeIn(tween(320)))
+                            .togetherWith(slideOutHorizontally(tween(220)) { -it / 8 } + fadeOut(tween(220)))
+                            .using(SizeTransform(clip = false))
+                    },
+                    label = "screen"
+                ) { screen ->
+                    when (screen) {
+                        Screen.HOME -> LevelSelectionScreen(
+                            isPro = isPro,
                             unlockedLevels = unlockedLevels,
-                            isOnlineMode = isOnlineMode,
                             themeMode = themeMode,
                             onThemeModeChange = {
                                 themeMode = it
                                 Persistence.saveThemeMode(it)
                             },
+                            language = language,
+                            onLanguageChange = {
+                                language = it
+                                Persistence.saveLanguage(it)
+                            },
+                            dailyCompletedToday = Persistence.isDailyCompleted(DailyUtil.todayDateKey()),
+                            dailyChain = Persistence.getDailyChain(),
                             onLevelClick = { level ->
                                 selectedMode = GameMode.NORMAL
                                 selectedLevel = level
                                 navigationStack.add(Screen.GAME)
                             },
+                            onProRequired = { reason ->
+                                paywallReason = reason
+                                showPaywall = true
+                            },
                             onDailyChallengeClick = {
-                                selectedMode = GameMode.DAILY
-                                navigationStack.add(Screen.GAME)
+                                if (!isPro) {
+                                    paywallReason = PaywallReason.CHALLENGE
+                                    showPaywall = true
+                                } else {
+                                    selectedMode = GameMode.DAILY
+                                    navigationStack.add(Screen.GAME)
+                                }
                             },
                             onTimedChallengeClick = {
-                                selectedMode = GameMode.TIMED
-                                selectedTimeLimit = 600
-                                navigationStack.add(Screen.GAME)
+                                if (!isPro) {
+                                    paywallReason = PaywallReason.CHALLENGE
+                                    showPaywall = true
+                                } else {
+                                    selectedMode = GameMode.TIMED
+                                    selectedTimeLimit = 600
+                                    navigationStack.add(Screen.GAME)
+                                }
                             },
-                            dailyCompletedToday = Persistence.isDailyCompleted(DailyUtil.todayDateKey()),
-                            dailyChain = Persistence.getDailyChain(),
-                            onLeaderboardClick = {
-                                navigationStack.add(Screen.LEADERBOARD)
+                            onStatsClick = {
+                                if (isPro) {
+                                    navigationStack.add(Screen.STATS)
+                                } else {
+                                    paywallReason = PaywallReason.STATS
+                                    showPaywall = true
+                                }
                             },
-                            onProfileClick = {
-                                navigationStack.add(Screen.PROFILE)
-                            },
-                            onBack = navigateBack
+                            onProClick = {
+                                paywallReason = PaywallReason.GENERAL
+                                showPaywall = true
+                            }
                         )
-                    }
-                    Screen.LEADERBOARD -> {
-                        LeaderboardScreen(onBack = navigateBack)
-                    }
-                    Screen.GAME -> {
-                        GameScreen(
+
+                        Screen.STATS -> StatsScreen(
+                            onBack = navigateBack,
+                            onUnlockPro = {
+                                paywallReason = PaywallReason.STATS
+                                showPaywall = true
+                            }
+                        )
+
+                        Screen.GAME -> GameScreen(
                             level = selectedLevel,
                             mode = selectedMode,
                             timeLimitSeconds = selectedTimeLimit,
                             onBack = navigateBack,
-                            onLevelCompleted = { completedLevel, score ->
+                            onLevelCompleted = { completedLevel, _ ->
                                 val next = completedLevel + 1
                                 if (selectedMode == GameMode.NORMAL && next > unlockedLevels) {
                                     unlockedLevels = next
                                     Persistence.saveUnlockedLevel(next)
                                 }
-                                if (isOnlineMode) {
-                                    scope.launch {
-                                        NetworkService.submitScore(completedLevel, score)
-                                    }
-                                }
                             },
                             onNextLevel = {
-                                selectedLevel++
+                                val next = selectedLevel + 1
+                                if (next > FreeTier.MAX_FREE_LEVEL && !isPro) {
+                                    paywallReason = PaywallReason.LEVELS
+                                    showPaywall = true
+                                } else if (next <= FreeTier.TOTAL_LEVELS) {
+                                    selectedLevel = next
+                                }
                             }
                         )
                     }
+                }
+
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
+
+                if (showPaywall) {
+                    PaywallDialog(
+                        reason = paywallReason,
+                        isPro = isPro,
+                        priceLabel = priceLabel,
+                        busy = busy,
+                        available = available,
+                        onPurchase = pro::purchase,
+                        onRestore = pro::restore,
+                        onDismiss = { showPaywall = false }
+                    )
                 }
             }
         }

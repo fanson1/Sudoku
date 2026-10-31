@@ -37,4 +37,6 @@ include(":app:desktopApp")
 include(":app:shared")
 include(":app:webApp")
 include(":core")
-include(":server")
+
+// :server is intentionally excluded — the app is fully offline/single-player.
+// The Ktor backend source is kept in /server for reference only.

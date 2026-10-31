@@ -38,6 +38,8 @@ import androidx.compose.foundation.focusable
 import androidx.compose.ui.input.key.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.finley.android.sudoku.i18n.LocalStrings
+import com.finley.android.sudoku.i18n.StringKey
 import com.finley.android.sudoku.model.Board
 import com.finley.android.sudoku.model.Cell
 import com.finley.android.sudoku.model.Difficulty
@@ -69,6 +71,7 @@ fun GameScreen(
     viewModel: GameViewModel = viewModel { GameViewModel() }
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val s = LocalStrings.current
     val focusRequester = remember { FocusRequester() }
     var showTimeUpDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
@@ -99,9 +102,9 @@ fun GameScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = when (mode) {
-                                GameMode.DAILY -> "每日挑战"
-                                GameMode.TIMED -> "限时挑战"
-                                GameMode.NORMAL -> "第 $level 关"
+                                GameMode.DAILY -> s[StringKey.DAILY_CHALLENGE]
+                                GameMode.TIMED -> s[StringKey.TIMED_CHALLENGE]
+                                GameMode.NORMAL -> s.fmt(StringKey.LEVEL_N, "n" to level)
                             },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
@@ -111,15 +114,15 @@ fun GameScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, s[StringKey.CD_BACK])
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.dispatch(GameIntent.StartNewGame) }) {
-                        Icon(Icons.Default.Refresh, "Restart")
+                        Icon(Icons.Default.Refresh, s[StringKey.CD_RESTART])
                     }
                     IconButton(onClick = { showSettings = true }) {
-                        Icon(Icons.Default.Settings, "Game Settings")
+                        Icon(Icons.Default.Settings, s[StringKey.CD_SETTINGS])
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -235,7 +238,7 @@ fun GameScreen(
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
-                                    text = "正在生成谜题…",
+                                    text = s[StringKey.GENERATING_PUZZLE],
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -296,21 +299,25 @@ fun GameScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             ActionButton(
-                                label = "撤销",
+                                label = s[StringKey.UNDO],
                                 enabled = state.canUndo && !state.isCompleted,
                                 onClick = { viewModel.dispatch(GameIntent.Undo) },
                                 modifier = Modifier.weight(1f)
                             )
                             ActionButton(
-                                label = "恢复",
+                                label = s[StringKey.REDO],
                                 enabled = state.canRedo && !state.isCompleted,
                                 onClick = { viewModel.dispatch(GameIntent.Redo) },
                                 modifier = Modifier.weight(1f)
                             )
                             ActionButton(
                                 icon = { Icon(Icons.Default.Lightbulb, null, modifier = Modifier.size(18.dp), tint = AppColors.hintGold) },
-                                label = "提示 (${state.hintsRemaining})",
-                                enabled = state.hintsRemaining > 0 && !state.isCompleted,
+                                label = if (state.unlimitedHints) {
+                                    s[StringKey.HINT_UNLIMITED]
+                                } else {
+                                    s.fmt(StringKey.HINT, "n" to state.hintsRemaining)
+                                },
+                                enabled = (state.unlimitedHints || state.hintsRemaining > 0) && !state.isCompleted,
                                 onClick = { viewModel.dispatch(GameIntent.RequestHint) },
                                 modifier = Modifier.weight(1.4f),
                                 emphasize = true
@@ -414,6 +421,7 @@ private fun GameStatsRow(
     onPauseToggle: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val s = LocalStrings.current
     val mistakesExceeded = mistakeCount > 0
     val mistakesColor = if (mistakesExceeded) colorScheme.error else colorScheme.onSurfaceVariant
 
@@ -443,7 +451,7 @@ private fun GameStatsRow(
     ) {
         StatChip(
             icon = Icons.Default.Timer,
-            text = if (isPaused) "已暂停" else formatTime(elapsedSeconds),
+            text = if (isPaused) s[StringKey.PAUSED] else formatTime(elapsedSeconds),
             modifier = Modifier.weight(1f)
         )
 
@@ -476,7 +484,7 @@ private fun GameStatsRow(
             IconButton(onClick = onPauseToggle, modifier = Modifier.fillMaxSize()) {
                 Icon(
                     imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                    contentDescription = if (isPaused) "Resume" else "Pause",
+                    contentDescription = if (isPaused) s[StringKey.RESUME_GAME] else s[StringKey.PAUSED],
                     tint = colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
                 )
@@ -524,6 +532,7 @@ private fun StatChip(
 @Composable
 private fun ComboChip(comboCount: Int) {
     val colorScheme = MaterialTheme.colorScheme
+    val s = LocalStrings.current
     val active = comboCount >= 2
     val scale = remember { Animatable(1f) }
     var prevCombo by remember { mutableStateOf(comboCount) }
@@ -573,7 +582,7 @@ private fun ComboChip(comboCount: Int) {
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-                text = if (comboCount >= 2) "x${comboCount}" else "连击",
+                text = if (comboCount >= 2) s.fmt(StringKey.COMBO_X, "n" to comboCount) else s[StringKey.COMBO],
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -874,6 +883,7 @@ private fun BoardProgressBar(
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val s = LocalStrings.current
     val toFill = board.cells.flatten().count { !it.isGiven }
     val filled = board.cells.flatten().count { it.value != null && !it.isGiven }
     val remaining = (toFill - filled).coerceAtLeast(0)
@@ -887,12 +897,16 @@ private fun BoardProgressBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "完成度",
+                text = s[StringKey.PROGRESS],
                 style = MaterialTheme.typography.labelMedium,
                 color = colorScheme.onSurfaceVariant
             )
             Text(
-                text = if (remaining > 0) "剩余 $remaining 格" else "全部完成",
+                text = if (remaining > 0) {
+                    s.fmt(StringKey.REMAINING_CELLS, "n" to remaining)
+                } else {
+                    s[StringKey.ALL_DONE]
+                },
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = if (remaining > 0) colorScheme.primary else colorScheme.secondary
@@ -936,6 +950,7 @@ fun NumberPad(
     nakedSingleValue: Int? = null
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val s = LocalStrings.current
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -946,13 +961,13 @@ fun NumberPad(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             PadToggleButton(
-                label = "笔记",
+                label = s[StringKey.NOTES],
                 active = notesMode,
                 onClick = onNotesToggle,
                 modifier = Modifier.weight(1f)
             )
             PadToggleButton(
-                label = "擦除",
+                label = s[StringKey.ERASE],
                 active = false,
                 destructive = true,
                 onClick = onEraseClick,
@@ -1089,7 +1104,7 @@ fun NumberButton(
             if (isCompleted) {
                 Icon(
                     imageVector = Icons.Default.Check,
-                    contentDescription = "Done",
+                    contentDescription = null,
                     tint = colorScheme.successGreen(),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -1185,6 +1200,7 @@ private fun DifficultyPill(difficulty: Difficulty) {
 // ---------------------------------------------------------------------------
 @Composable
 private fun PauseOverlay(onResume: () -> Unit) {
+    val s = LocalStrings.current
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1209,7 +1225,7 @@ private fun PauseOverlay(onResume: () -> Unit) {
             }
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = "游戏已暂停",
+                text = s[StringKey.GAME_PAUSED],
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -1218,7 +1234,7 @@ private fun PauseOverlay(onResume: () -> Unit) {
             GradientButton(onClick = onResume, modifier = Modifier.padding(horizontal = 48.dp)) {
                 Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("继续游戏", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(s[StringKey.RESUME_GAME], fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -1238,6 +1254,7 @@ private fun VictoryDialog(
     onNextLevel: () -> Unit,
     onBackToLevels: () -> Unit
 ) {
+    val s = LocalStrings.current
     val dialogShape = RoundedCornerShape(28.dp)
     Dialog(onDismissRequest = {}) {
         DialogEntrance {
@@ -1275,12 +1292,12 @@ private fun VictoryDialog(
 
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = if (isDaily) "每日挑战完成!" else "恭喜通关!",
+                            text = if (isDaily) s[StringKey.DAILY_VICTORY] else s[StringKey.VICTORY],
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Black
                         )
                         Text(
-                            text = "第 $level 关已完成",
+                            text = s.fmt(StringKey.LEVEL_COMPLETED, "n" to level),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp)
@@ -1293,14 +1310,14 @@ private fun VictoryDialog(
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                         ) {
                             Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                                ResultRow("关卡", "$level")
+                                ResultRow(s[StringKey.RESULT_LEVEL], "$level")
                                 Spacer(modifier = Modifier.height(8.dp))
-                                ResultRow("用时", time)
+                                ResultRow(s[StringKey.RESULT_TIME], time)
                                 Spacer(modifier = Modifier.height(8.dp))
-                                ResultRow("失误", mistakes.toString())
+                                ResultRow(s[StringKey.RESULT_MISTAKES], mistakes.toString())
                                 if (comboCount >= 2) {
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    ResultRow("最高连击", "x$comboCount")
+                                    ResultRow(s[StringKey.RESULT_MAX_COMBO], s.fmt(StringKey.COMBO_X, "n" to comboCount))
                                 }
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
                                 Row(
@@ -1309,7 +1326,7 @@ private fun VictoryDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "得分",
+                                        text = s[StringKey.SCORE],
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold
                                     )
@@ -1327,7 +1344,7 @@ private fun VictoryDialog(
 
                         if (isDaily) {
                             GhostButton(onClick = onBackToLevels, modifier = Modifier.fillMaxWidth(), height = 48.dp) {
-                                Text("返回关卡列表", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text(s[StringKey.BACK_TO_LEVELS], fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             }
                         } else {
                             GradientButton(
@@ -1335,11 +1352,11 @@ private fun VictoryDialog(
                                 modifier = Modifier.fillMaxWidth(),
                                 height = 54.dp
                             ) {
-                                Text("下一关", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Text(s[StringKey.NEXT_LEVEL], fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.height(10.dp))
                             GhostButton(onClick = onBackToLevels, modifier = Modifier.fillMaxWidth(), height = 48.dp) {
-                                Text("返回关卡列表", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text(s[StringKey.BACK_TO_LEVELS], fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
@@ -1375,6 +1392,7 @@ private fun GameOverDialog(
     onRetry: () -> Unit,
     onBackToLevels: () -> Unit
 ) {
+    val s = LocalStrings.current
     Dialog(onDismissRequest = {}) {
         DialogEntrance {
             Surface(
@@ -1402,12 +1420,12 @@ private fun GameOverDialog(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = if (isTimeUp) "时间到!" else "挑战失败",
+                        text = if (isTimeUp) s[StringKey.TIME_UP] else s[StringKey.CHALLENGE_FAILED],
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Black
                     )
                     Text(
-                        text = if (isTimeUp) "未在限定时间内完成" else "失误次数已达上限",
+                        text = if (isTimeUp) s[StringKey.TIME_UP_SUBTITLE] else s[StringKey.MISTAKES_LIMIT_SUBTITLE],
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
@@ -1422,11 +1440,11 @@ private fun GameOverDialog(
                     ) {
                         Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("再试一次", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text(s[StringKey.TRY_AGAIN], fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     GhostButton(onClick = onBackToLevels, modifier = Modifier.fillMaxWidth(), height = 48.dp) {
-                        Text("返回关卡列表", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(s[StringKey.BACK_TO_LEVELS], fontSize = 14.sp, fontWeight = FontWeight.Medium)
                     }
                 }
             }
@@ -1504,6 +1522,7 @@ fun calculateScore(state: GameState): Int {
 @Preview(showBackground = true, backgroundColor = 0xFFEDF1F6, widthDp = 411, heightDp = 500)
 private fun GameControlsPreview() {
     AppTheme {
+        val s = LocalStrings.current
         Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Column {
                 NumberPad(
@@ -1520,13 +1539,13 @@ private fun GameControlsPreview() {
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     ActionButton(
-                        label = "撤销",
+                        label = s[StringKey.UNDO],
                         enabled = true,
                         onClick = {},
                         modifier = Modifier.weight(1f)
                     )
                     ActionButton(
-                        label = "恢复",
+                        label = s[StringKey.REDO],
                         enabled = true,
                         onClick = {},
                         modifier = Modifier.weight(1f)
@@ -1540,7 +1559,7 @@ private fun GameControlsPreview() {
                                 tint = AppColors.hintGold
                             )
                         },
-                        label = "提示 (3)",
+                        label = s.fmt(StringKey.HINT, "n" to 3),
                         enabled = true,
                         onClick = {},
                         modifier = Modifier.weight(1.4f),

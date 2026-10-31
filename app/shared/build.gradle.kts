@@ -63,19 +63,11 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.multiplatform.settings)
             implementation(libs.kotlinx.datetime)
-
-            // Ktor Client
-            implementation(libs.ktor.clientCore)
-            implementation(libs.ktor.clientContentNegotiation)
-            implementation(libs.ktor.clientSerialization)
         }
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
-            implementation(libs.ktor.clientOkHttp)
             implementation(libs.androidx.activity.compose)
-        }
-        jvmMain.dependencies {
-            implementation(libs.ktor.clientOkHttp)
+            implementation(libs.billing)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

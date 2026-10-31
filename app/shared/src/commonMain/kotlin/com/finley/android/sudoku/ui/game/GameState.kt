@@ -26,6 +26,7 @@ data class GameState(
     val isPaused: Boolean = false,
     val isCompleted: Boolean = false,
     val hintsRemaining: Int = GameRules.getInitialHintsForLevel(1),
+    val unlimitedHints: Boolean = false,
     val isLoading: Boolean = true,
     val autoEraseNotes: Boolean = true,
     val showConflicts: Boolean = true,

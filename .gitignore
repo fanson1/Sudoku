@@ -115,6 +115,7 @@ Desktop.ini
 *.jks
 *.key
 *.pem
+keystore/keystore.properties
 
 
 .kotlin/

@@ -133,6 +133,7 @@ class GameViewModel(
     private fun loadPuzzle(puzzle: Puzzle, level: Int) {
         val board = parsePuzzleToBoard(puzzle)
         val dailyDate = _state.value.dailyDate
+        val isPro = Persistence.isPro()
         _state.value = _state.value.copy(
             board = board,
             solution = puzzle.solution,
@@ -144,7 +145,8 @@ class GameViewModel(
             mistakeCount = 0,
             maxMistakes = 5,
             comboCount = 0,
-            hintsRemaining = GameRules.getInitialHintsForLevel(level),
+            hintsRemaining = if (isPro) 0 else GameRules.getInitialHintsForLevel(level),
+            unlimitedHints = isPro,
             selectedCell = null,
             elapsedSeconds = 0,
             history = emptyList(),
@@ -458,7 +460,8 @@ class GameViewModel(
     }
     private fun requestHint() {
         val currentState = _state.value
-        if (currentState.hintsRemaining <= 0 || currentState.isCompleted) return
+        if (currentState.isCompleted) return
+        if (!currentState.unlimitedHints && currentState.hintsRemaining <= 0) return
 
         val emptyCells = currentState.board.cells.flatten().filter { it.value == null }
         if (emptyCells.isEmpty()) return
@@ -482,7 +485,11 @@ class GameViewModel(
         
         _state.value = currentState.copy(
             board = newBoard,
-            hintsRemaining = currentState.hintsRemaining - 1,
+            hintsRemaining = if (currentState.unlimitedHints) {
+                currentState.hintsRemaining
+            } else {
+                currentState.hintsRemaining - 1
+            },
             history = newHistory,
             historyCursor = newHistory.lastIndex,
             canUndo = true,

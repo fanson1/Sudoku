@@ -26,16 +26,17 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Leaderboard
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -63,35 +64,41 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.finley.android.sudoku.i18n.Language
+import com.finley.android.sudoku.i18n.LocalStrings
+import com.finley.android.sudoku.i18n.StringKey
 import com.finley.android.sudoku.model.Difficulty
 import com.finley.android.sudoku.model.GameRules
 import com.finley.android.sudoku.ui.components.AppScreenBackground
 import com.finley.android.sudoku.ui.components.DifficultyDot
+import com.finley.android.sudoku.ui.components.PaywallReason
 import com.finley.android.sudoku.ui.components.SettingsSheetContent
 import com.finley.android.sudoku.ui.components.difficultyColor
 import com.finley.android.sudoku.ui.components.difficultyLabel
 import com.finley.android.sudoku.ui.components.pressScale
 import com.finley.android.sudoku.ui.theme.ThemeMode
+import com.finley.android.sudoku.util.FreeTier
 import kotlinx.coroutines.delay
-
-private const val TOTAL_LEVELS = 50
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LevelSelectionScreen(
+    isPro: Boolean,
     unlockedLevels: Int,
-    isOnlineMode: Boolean = false,
-    themeMode: ThemeMode = ThemeMode.SYSTEM,
-    onThemeModeChange: (ThemeMode) -> Unit = {},
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
+    language: Language,
+    onLanguageChange: (Language) -> Unit,
+    dailyCompletedToday: Boolean,
+    dailyChain: Int,
     onLevelClick: (Int) -> Unit,
-    onDailyChallengeClick: () -> Unit = {},
-    onTimedChallengeClick: () -> Unit = {},
-    dailyCompletedToday: Boolean = false,
-    dailyChain: Int = 0,
-    onLeaderboardClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {},
-    onBack: () -> Unit
+    onProRequired: (PaywallReason) -> Unit,
+    onDailyChallengeClick: () -> Unit,
+    onTimedChallengeClick: () -> Unit,
+    onStatsClick: () -> Unit,
+    onProClick: () -> Unit
 ) {
+    val s = LocalStrings.current
     var showSettings by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -100,27 +107,23 @@ fun LevelSelectionScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        "选择关卡",
+                        text = s[StringKey.APP_NAME],
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Black
                     )
                 },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
                 actions = {
-                    if (isOnlineMode) {
-                        IconButton(onClick = onProfileClick) {
-                            Icon(Icons.Default.AccountCircle, "Profile")
-                        }
-                        IconButton(onClick = onLeaderboardClick) {
-                            Icon(Icons.Default.Leaderboard, "Leaderboard")
-                        }
+                    IconButton(onClick = onStatsClick) {
+                        Icon(
+                            imageVector = Icons.Default.BarChart,
+                            contentDescription = s[StringKey.CD_STATS]
+                        )
                     }
                     IconButton(onClick = { showSettings = true }) {
-                        Icon(Icons.Default.Settings, "Settings")
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = s[StringKey.CD_SETTINGS]
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -136,66 +139,82 @@ fun LevelSelectionScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp)
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(84.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 28.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxSize()
             ) {
-                LevelProgressHeader(unlockedLevels = unlockedLevels)
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    ChallengeCard(
-                        title = "每日挑战",
-                        subtitle = if (dailyCompletedToday) "今日已完成" else "每天一道题",
-                        icon = Icons.Default.CalendarMonth,
-                        badge = if (dailyCompletedToday) "✓" else null,
-                        goalLabel = if (dailyChain > 0) "连续 $dailyChain 天" else null,
-                        modifier = Modifier.weight(1f),
-                        onClick = onDailyChallengeClick
-                    )
-                    ChallengeCard(
-                        title = "限时挑战",
-                        subtitle = "10 分钟",
-                        icon = Icons.Default.Timer,
-                        modifier = Modifier.weight(1f),
-                        onClick = onTimedChallengeClick
-                    )
+                item(key = "progress", span = { GridItemSpan(maxLineSpan) }) {
+                    LevelProgressHeader(unlockedLevels = unlockedLevels)
                 }
 
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(84.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Difficulty.entries.forEachIndexed { diffIndex, difficulty ->
-                        val start = diffIndex * 10 + 1
-                        val end = minOf(start + 9, TOTAL_LEVELS)
+                item(key = "pro", span = { GridItemSpan(maxLineSpan) }) {
+                    if (isPro) {
+                        ProActiveCard()
+                    } else {
+                        ProBanner(onClick = onProClick)
+                    }
+                }
 
-                        item(key = "header-$difficulty", span = { GridItemSpan(maxLineSpan) }) {
-                            DifficultySectionHeader(
-                                difficulty = difficulty,
-                                range = start..end,
-                                unlockedLevels = unlockedLevels
-                            )
-                        }
+                item(key = "challenges", span = { GridItemSpan(maxLineSpan) }) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ChallengeCard(
+                            title = s[StringKey.DAILY_CHALLENGE],
+                            subtitle = if (dailyCompletedToday) {
+                                s[StringKey.DAILY_DONE]
+                            } else {
+                                s[StringKey.DAILY_SUBTITLE]
+                            },
+                            icon = Icons.Default.CalendarMonth,
+                            badge = if (dailyCompletedToday) "✓" else null,
+                            goalLabel = if (dailyChain > 0) {
+                                s.fmt(StringKey.DAILY_STREAK, "n" to dailyChain)
+                            } else {
+                                null
+                            },
+                            locked = !isPro,
+                            modifier = Modifier.weight(1f),
+                            onClick = onDailyChallengeClick
+                        )
+                        ChallengeCard(
+                            title = s[StringKey.TIMED_CHALLENGE],
+                            subtitle = s[StringKey.TIMED_SUBTITLE],
+                            icon = Icons.Default.Timer,
+                            locked = !isPro,
+                            modifier = Modifier.weight(1f),
+                            onClick = onTimedChallengeClick
+                        )
+                    }
+                }
 
-                        items((start..end).toList(), key = { it }) { level ->
-                            val isUnlocked = level <= unlockedLevels
-                            LevelItem(
-                                level = level,
-                                isUnlocked = isUnlocked,
-                                isCurrent = level == unlockedLevels && isUnlocked,
-                                modifier = Modifier.animateItem(),
-                                onClick = { if (isUnlocked) onLevelClick(level) }
-                            )
-                        }
+                Difficulty.entries.forEachIndexed { diffIndex, difficulty ->
+                    val start = diffIndex * 10 + 1
+                    val end = minOf(start + 9, FreeTier.TOTAL_LEVELS)
+
+                    item(key = "header-$difficulty", span = { GridItemSpan(maxLineSpan) }) {
+                        DifficultySectionHeader(
+                            difficulty = difficulty,
+                            range = start..end,
+                            unlockedLevels = unlockedLevels
+                        )
+                    }
+
+                    items((start..end).toList(), key = { it }) { level ->
+                        LevelItem(
+                            level = level,
+                            unlockedLevels = unlockedLevels,
+                            isPro = isPro,
+                            modifier = Modifier.animateItem(),
+                            onClick = { onLevelClick(level) },
+                            onProRequired = { onProRequired(PaywallReason.LEVELS) }
+                        )
                     }
                 }
             }
@@ -219,11 +238,131 @@ fun LevelSelectionScreen(
         ) {
             SettingsSheetContent(
                 themeMode = themeMode,
-                onThemeModeChange = {
-                    onThemeModeChange(it)
+                onThemeModeChange = onThemeModeChange,
+                language = language,
+                onLanguageChange = onLanguageChange,
+                isPro = isPro,
+                onUpgradeClick = {
+                    showSettings = false
+                    onProClick()
                 }
             )
             Spacer(modifier = Modifier.navigationBarsPadding().height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun ProBanner(onClick: () -> Unit) {
+    val s = LocalStrings.current
+    val colorScheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(18.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(8.dp, shape, ambientColor = colorScheme.primary.copy(alpha = 0.3f))
+            .pressScale(interactionSource),
+        interactionSource = interactionSource,
+        shape = shape,
+        color = Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.linearGradient(
+                        listOf(colorScheme.primary, colorScheme.secondary)
+                    )
+                )
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.WorkspacePremium,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = s[StringKey.PRO_ENTRY_TITLE],
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = s[StringKey.PRO_ENTRY_SUBTITLE],
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.85f)
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProActiveCard() {
+    val s = LocalStrings.current
+    val colorScheme = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = colorScheme.primaryContainer.copy(alpha = 0.55f),
+        contentColor = colorScheme.onPrimaryContainer
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(colorScheme.primary.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.WorkspacePremium,
+                    contentDescription = null,
+                    tint = colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = s[StringKey.PRO_ACTIVE],
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = s[StringKey.PRO_ACTIVE_SUBTITLE],
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = colorScheme.primary
+            )
         }
     }
 }
@@ -234,12 +373,13 @@ private fun DifficultySectionHeader(
     range: IntRange,
     unlockedLevels: Int
 ) {
+    val s = LocalStrings.current
     val colorScheme = MaterialTheme.colorScheme
     val diffColor = difficultyColor(difficulty)
     val total = range.count()
     val completed = range.count { it < unlockedLevels }
 
-    Column(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
+    Column(modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -262,7 +402,7 @@ private fun DifficultySectionHeader(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "第 ${range.first}-${range.last} 关",
+                text = s.fmt(StringKey.LEVEL_RANGE, "a" to range.first, "b" to range.last),
                 style = MaterialTheme.typography.labelMedium,
                 color = colorScheme.onSurfaceVariant
             )
@@ -274,7 +414,7 @@ private fun DifficultySectionHeader(
                 color = if (completed == total) diffColor else colorScheme.onSurfaceVariant
             )
         }
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -290,13 +430,13 @@ private fun DifficultySectionHeader(
 
 @Composable
 private fun LevelProgressHeader(unlockedLevels: Int) {
-    val progress = (unlockedLevels.toFloat() / TOTAL_LEVELS).coerceIn(0f, 1f)
+    val s = LocalStrings.current
+    val progress = (unlockedLevels.toFloat() / FreeTier.TOTAL_LEVELS).coerceIn(0f, 1f)
     val animatedProgress by animateFloatAsState(progress, label = "progress")
     val animatedCount by animateIntAsState(unlockedLevels, label = "count")
-
     val colorScheme = MaterialTheme.colorScheme
 
-    Column(modifier = Modifier.padding(bottom = 16.dp, top = 4.dp)) {
+    Column(modifier = Modifier.padding(bottom = 10.dp, top = 4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -304,12 +444,16 @@ private fun LevelProgressHeader(unlockedLevels: Int) {
         ) {
             Column {
                 Text(
-                    text = "关卡进度",
+                    text = s[StringKey.PROGRESS_TITLE],
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "已解锁 $animatedCount / $TOTAL_LEVELS",
+                    text = s.fmt(
+                        StringKey.PROGRESS_UNLOCKED,
+                        "done" to animatedCount,
+                        "total" to FreeTier.TOTAL_LEVELS
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = colorScheme.onSurfaceVariant
                 )
@@ -354,8 +498,10 @@ private fun ChallengeCard(
     modifier: Modifier = Modifier,
     badge: String? = null,
     goalLabel: String? = null,
+    locked: Boolean = false,
     onClick: () -> Unit
 ) {
+    val s = LocalStrings.current
     val colorScheme = MaterialTheme.colorScheme
     val interactionSource = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(16.dp)
@@ -363,7 +509,7 @@ private fun ChallengeCard(
     Surface(
         onClick = onClick,
         modifier = modifier
-            .height(96.dp)
+            .height(100.dp)
             .shadow(6.dp, shape)
             .pressScale(interactionSource),
         interactionSource = interactionSource,
@@ -374,16 +520,14 @@ private fun ChallengeCard(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Surface(
                 modifier = Modifier.size(40.dp),
                 shape = RoundedCornerShape(12.dp),
-                color = if (badge != null) colorScheme.primary.copy(alpha = 0.2f) else colorScheme.primary.copy(
-                    alpha = 0.15f
-                ),
+                color = colorScheme.primary.copy(alpha = 0.15f),
                 contentColor = colorScheme.primary
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -421,6 +565,8 @@ private fun ChallengeCard(
                         fontWeight = FontWeight.Bold,
                         color = colorScheme.secondary
                     )
+                } else if (locked) {
+                    ProPill()
                 }
             }
         }
@@ -428,17 +574,42 @@ private fun ChallengeCard(
 }
 
 @Composable
+private fun ProPill() {
+    val s = LocalStrings.current
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary
+    ) {
+        Text(
+            text = s[StringKey.PRO_BADGE],
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 1.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Black
+        )
+    }
+}
+
+@Composable
 private fun LevelItem(
     level: Int,
-    isUnlocked: Boolean,
-    isCurrent: Boolean,
+    unlockedLevels: Int,
+    isPro: Boolean,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onProRequired: () -> Unit
 ) {
+    val s = LocalStrings.current
     val colorScheme = MaterialTheme.colorScheme
     val difficulty = GameRules.getDifficultyForLevel(level)
     val diffColor = difficultyColor(difficulty)
     val shape = RoundedCornerShape(16.dp)
+
+    val requiresPro = !FreeTier.isLevelFree(level) && !isPro
+    val unlockedByProgress = level <= unlockedLevels
+    val playable = unlockedByProgress && !requiresPro
+    val isCurrent = playable && level == unlockedLevels
+    val isCompleted = unlockedByProgress && level != unlockedLevels
 
     val background = when {
         isCurrent -> Brush.linearGradient(
@@ -448,7 +619,7 @@ private fun LevelItem(
             )
         )
 
-        isUnlocked -> Brush.linearGradient(
+        playable -> Brush.linearGradient(
             listOf(
                 colorScheme.surface.copy(alpha = 0.92f),
                 colorScheme.surfaceVariant.copy(alpha = 0.9f)
@@ -468,7 +639,6 @@ private fun LevelItem(
         label = "levelScale"
     )
 
-    // Staggered pop-in entrance (cascades across the grid on first render).
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         delay((level % 10) * 35L)
@@ -504,46 +674,66 @@ private fun LevelItem(
                 scaleY = scaleAnim * entranceScale
                 alpha = entranceAlpha
             }
-            .clickable(enabled = isUnlocked) { onClick() },
+            .clickable(enabled = playable || requiresPro) {
+                if (playable) onClick() else onProRequired()
+            },
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (isUnlocked) {
-                // Difficulty dot (top-start)
-                DifficultyDot(
-                    color = diffColor,
-                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 2.dp)
-                )
-                Text(
-                    text = level.toString(),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isCurrent) colorScheme.onPrimary else colorScheme.onSurface,
-                    textAlign = TextAlign.Center
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = "Locked",
-                    tint = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(20.dp)
-                )
+            when {
+                requiresPro -> {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = s[StringKey.CD_LOCKED],
+                        tint = colorScheme.primary.copy(alpha = 0.75f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = s[StringKey.PRO_BADGE],
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        color = colorScheme.primary
+                    )
+                }
+
+                playable -> {
+                    DifficultyDot(
+                        color = diffColor,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                    Text(
+                        text = level.toString(),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isCurrent) colorScheme.onPrimary else colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                else -> {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = s[StringKey.CD_LOCKED],
+                        tint = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
 
-        if (isUnlocked && !isCurrent) {
+        if (isCompleted) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(5.dp)
                     .size(16.dp),
-                shape = androidx.compose.foundation.shape.CircleShape,
+                shape = CircleShape,
                 color = com.finley.android.sudoku.ui.theme.SuccessGreen,
                 contentColor = Color.White
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
-                    contentDescription = "Completed",
+                    contentDescription = null,
                     modifier = Modifier.padding(3.dp)
                 )
             }

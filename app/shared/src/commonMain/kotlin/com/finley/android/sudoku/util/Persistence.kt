@@ -1,15 +1,21 @@
 package com.finley.android.sudoku.util
 
+import com.finley.android.sudoku.i18n.Language
 import com.finley.android.sudoku.model.Difficulty
 import com.finley.android.sudoku.ui.theme.ThemeMode
 import com.russhwolf.settings.Settings
 
+/**
+ * Local-only persistence. The app has no backend and no account system, so
+ * everything lives in platform settings storage (SharedPreferences,
+ * NSUserDefaults, localStorage, java.util.prefs).
+ */
 object Persistence {
     private val settings: Settings = Settings()
     private const val KEY_UNLOCKED_LEVEL = "unlocked_level"
-    private const val KEY_AUTH_TOKEN = "auth_token"
-    private const val KEY_USERNAME = "username"
     private const val KEY_THEME_MODE = "theme_mode"
+    private const val KEY_LANGUAGE = "language"
+    private const val KEY_PRO_UNLOCKED = "pro_unlocked"
     private const val KEY_DAILY_COMPLETED = "daily_completed"
     private const val KEY_DAILY_CHAIN = "daily_chain"
     private const val KEY_DAILY_LAST = "daily_last"
@@ -36,51 +42,43 @@ object Persistence {
 
     fun getDailyChain(): Int = settings.getInt(KEY_DAILY_CHAIN, 0)
 
-    fun getThemeMode(): ThemeMode {
-        return when (settings.getStringOrNull(KEY_THEME_MODE)) {
+    fun getThemeMode(): ThemeMode =
+        when (settings.getStringOrNull(KEY_THEME_MODE)) {
             "light" -> ThemeMode.LIGHT
             "dark" -> ThemeMode.DARK
             else -> ThemeMode.SYSTEM
         }
-    }
 
     fun saveThemeMode(mode: ThemeMode) {
-        settings.putString(KEY_THEME_MODE, when (mode) {
-            ThemeMode.LIGHT -> "light"
-            ThemeMode.DARK -> "dark"
-            ThemeMode.SYSTEM -> "system"
-        })
+        settings.putString(
+            KEY_THEME_MODE,
+            when (mode) {
+                ThemeMode.LIGHT -> "light"
+                ThemeMode.DARK -> "dark"
+                ThemeMode.SYSTEM -> "system"
+            }
+        )
     }
 
-    fun getUnlockedLevel(): Int {
-        return settings.getInt(KEY_UNLOCKED_LEVEL, 1)
+    fun getLanguage(): Language =
+        Language.fromCode(settings.getStringOrNull(KEY_LANGUAGE))
+
+    fun saveLanguage(language: Language) {
+        settings.putString(KEY_LANGUAGE, language.code)
     }
+
+    fun isPro(): Boolean = settings.getBoolean(KEY_PRO_UNLOCKED, false)
+
+    fun setPro(unlocked: Boolean) {
+        settings.putBoolean(KEY_PRO_UNLOCKED, unlocked)
+    }
+
+    fun getUnlockedLevel(): Int = settings.getInt(KEY_UNLOCKED_LEVEL, 1)
 
     fun saveUnlockedLevel(level: Int) {
-        val current = getUnlockedLevel()
-        if (level > current) {
+        if (level > getUnlockedLevel()) {
             settings.putInt(KEY_UNLOCKED_LEVEL, level)
         }
-    }
-
-    fun saveAuthToken(token: String?) {
-        if (token != null) settings.putString(KEY_AUTH_TOKEN, token)
-        else settings.remove(KEY_AUTH_TOKEN)
-    }
-
-    fun getAuthToken(): String? = settings.getStringOrNull(KEY_AUTH_TOKEN)
-
-    fun saveUsername(username: String?) {
-        if (username != null) settings.putString(KEY_USERNAME, username)
-        else settings.remove(KEY_USERNAME)
-    }
-
-    fun getUsername(): String? = settings.getStringOrNull(KEY_USERNAME)
-
-    fun clearAuth() {
-        settings.remove(KEY_AUTH_TOKEN)
-        settings.remove(KEY_USERNAME)
-        settings.remove(KEY_UNLOCKED_LEVEL)
     }
 
     // Game settings
@@ -94,6 +92,11 @@ object Persistence {
     fun getGamesPlayed(): Int = settings.getInt(KEY_GAMES_PLAYED, 0)
     fun getGamesWon(): Int = settings.getInt(KEY_GAMES_WON, 0)
     fun getBestScore(): Int = settings.getInt(KEY_BEST_SCORE, 0)
+
+    fun getWinRate(): Int {
+        val played = getGamesPlayed()
+        return if (played <= 0) 0 else (getGamesWon() * 100) / played
+    }
 
     fun recordGame(difficulty: Difficulty, won: Boolean, score: Int) {
         settings.putInt(KEY_GAMES_PLAYED, getGamesPlayed() + 1)
